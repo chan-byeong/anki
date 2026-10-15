@@ -20,7 +20,9 @@ Use the Artifact tool with the canvas URL:
 - `action: "list"`, `scope: "files"`: lists the files.
 - `action: "read"`, `path: "project/<name>.dc.html"` (or `paths: [...]`): fetches artboards.
 - `project/canvas.json` is the index: each artboard's file name and its Korean `title` (e.g. `"복습 3 · 정답과 평가"`). Start there to find the artboard for a screen.
-- Token values live in stylesheets linked from each artboard's `<head>` as `<link rel="stylesheet" href="/_blob/<id>">`. Read them with `path: "<id>"`.
+- Token values and component styles live in stylesheets linked from each artboard's `<head>` as `<link rel="stylesheet" href="/_blob/<id>">`: the first is `tokens.css`, the second is `components.css` (exact heights, radii, gaps, font weights per component). They are assets, not published files, so they don't appear in `scope: "files"`; `scope: "assets"` lists them.
+  - Read each one with its own call: `action: "read"`, `path: "<id>"` (the bare 32-hex id, no `/_blob/`). `paths: [...]` fails with "no file is published at that path" for ids, so don't use it for stylesheets.
+  - Then Read the saved `<id>.css` file. Read `components.css` before building or changing any shared component; the `dl` notes in `Components.dc.html` summarize but don't give numbers.
 
 Read only the artboards for the screen you're building, not the whole canvas.
 
