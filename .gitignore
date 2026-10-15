@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# blog drafts
+/wiki
+/docs/adr
+/docs/research
+/docs/design-brief.md
