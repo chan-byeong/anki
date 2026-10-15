@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet } from 'react-native';
 
-import { size } from '../theme/tokens';
+import { radius, size } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { IconComponent } from './icons';
 
@@ -12,8 +12,9 @@ export interface IconButtonProps {
   label: string;
   onPress?: () => void;
   tone?: IconButtonTone;
-  // 켜고 끄는 버튼(메모 열기/닫기)의 현재 상태.
+  // 켜고 끄는 버튼(메모 열기/닫기)의 현재 상태. 켜지면 바탕이 채워진다.
   pressed?: boolean;
+  disabled?: boolean;
   iconSize?: number;
 }
 
@@ -23,18 +24,27 @@ export function IconButton({
   onPress,
   tone = 'text',
   pressed,
+  disabled = false,
   iconSize,
 }: IconButtonProps) {
   const { colors } = useTheme();
-  const color = tone === 'muted' ? colors.muted : colors.text;
+  const on = pressed === true;
+  const color = on ? colors.inverse : tone === 'muted' ? colors.muted : colors.text;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={pressed === undefined ? undefined : { selected: pressed }}
+      accessibilityState={{ disabled, ...(pressed === undefined ? {} : { selected: pressed }) }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed: touching }) => [styles.base, { opacity: touching ? 0.5 : 1 }]}
+      style={({ pressed: touching }) => [
+        styles.base,
+        {
+          backgroundColor: on ? colors.text : 'transparent',
+          opacity: disabled ? 0.4 : touching ? 0.5 : 1,
+        },
+      ]}
     >
       <Icon color={color} size={iconSize ?? (tone === 'muted' ? 20 : 22)} />
     </Pressable>
@@ -45,6 +55,7 @@ const styles = StyleSheet.create({
   base: {
     width: size.touch,
     height: size.touch,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

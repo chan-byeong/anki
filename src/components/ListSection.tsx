@@ -6,17 +6,19 @@ import { useTheme } from '../theme/ThemeProvider';
 
 interface ListSectionProps {
   label: string;
+  // 설정처럼 촘촘한 목록: 라벨 위 여백을 줄이고 아래 여백을 없앤다.
+  dense?: boolean;
   children: ReactNode;
 }
 
-export function ListSection({ label, children }: ListSectionProps) {
+export function ListSection({ label, dense = false, children }: ListSectionProps) {
   const { colors, text } = useTheme();
 
   return (
     <View>
       <Text
         accessibilityRole="header"
-        style={[text('caption', { weight: 'bold' }), styles.label, { color: colors.muted }]}
+        style={[text('caption'), dense ? styles.dense : styles.label, { color: colors.muted }]}
       >
         {label}
       </Text>
@@ -26,5 +28,6 @@ export function ListSection({ label, children }: ListSectionProps) {
 }
 
 const styles = StyleSheet.create({
-  label: { paddingTop: space[3], paddingBottom: space[2] },
+  label: { paddingTop: space[4], paddingBottom: space[1] },
+  dense: { paddingTop: space[2] },
 });

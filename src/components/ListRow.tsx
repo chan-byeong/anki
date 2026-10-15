@@ -21,16 +21,30 @@ interface ListRowProps {
   leading?: ReactNode;
   trailing?: ListRowTrailing;
   onPress?: () => void;
+  // 한 줄짜리 설정 목록: 최소 높이 56.
+  compact?: boolean;
+  // 목록의 마지막 행은 아래 선이 없다.
+  last?: boolean;
 }
 
-export function ListRow({ title, sub, ja = false, leading, trailing, onPress }: ListRowProps) {
+export function ListRow({
+  title,
+  sub,
+  ja = false,
+  leading,
+  trailing,
+  onPress,
+  compact = false,
+  last = false,
+}: ListRowProps) {
   const { colors, text } = useTheme();
+  const minHeight = compact ? size.button : size.row;
 
   const body = (
     <>
       {leading}
       <View style={styles.text}>
-        <Text style={text('body', { ja })} numberOfLines={1}>
+        <Text style={text('body', { weight: 'bold', ja })} numberOfLines={1}>
           {title}
         </Text>
         {sub ? (
@@ -40,10 +54,10 @@ export function ListRow({ title, sub, ja = false, leading, trailing, onPress }: 
         ) : null}
       </View>
       {trailing?.kind === 'value' ? (
-        <>
+        <View style={styles.value}>
           <Text style={[text('body'), { color: colors.muted }]}>{trailing.value}</Text>
           <ChevronRightIcon color={colors.muted} size={18} />
-        </>
+        </View>
       ) : null}
       {trailing?.kind === 'due' ? (
         <Text style={text('caption', { weight: 'bold' })}>{trailing.label}</Text>
@@ -53,17 +67,22 @@ export function ListRow({ title, sub, ja = false, leading, trailing, onPress }: 
   );
 
   return (
-    <View style={[styles.row, { borderBottomColor: colors.line }]}>
+    <View
+      style={[
+        styles.row,
+        { minHeight, borderBottomColor: colors.line, borderBottomWidth: last ? 0 : 1 },
+      ]}
+    >
       {onPress ? (
         <Pressable
           accessibilityRole="button"
           onPress={onPress}
-          style={({ pressed }) => [styles.main, { opacity: pressed ? 0.6 : 1 }]}
+          style={({ pressed }) => [styles.main, { minHeight, opacity: pressed ? 0.6 : 1 }]}
         >
           {body}
         </Pressable>
       ) : (
-        <View style={styles.main}>{body}</View>
+        <View style={[styles.main, { minHeight }]}>{body}</View>
       )}
       {trailing?.kind === 'button' ? (
         <Button
@@ -79,19 +98,14 @@ export function ListRow({ title, sub, ja = false, leading, trailing, onPress }: 
 }
 
 const styles = StyleSheet.create({
-  row: {
-    minHeight: size.row,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   main: {
     flex: 1,
-    minHeight: size.row,
+    paddingVertical: space[2],
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[2],
   },
-  text: { flex: 1, gap: space[1] },
+  text: { flex: 1 },
+  value: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
 });

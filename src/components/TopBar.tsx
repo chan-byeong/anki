@@ -23,17 +23,18 @@ export function TopBar({
   trailing = [],
 }: TopBarProps) {
   const { text } = useTheme();
+  const titled = title !== undefined;
 
   return (
-    <View style={styles.bar}>
-      <View style={styles.side}>
+    <View style={[styles.bar, !titled && styles.spread]}>
+      <View style={[styles.side, titled && styles.slot]}>
         <IconButton
           icon={leading === 'back' ? ChevronLeftIcon : CloseIcon}
           label={leadingLabel}
           onPress={onLeadingPress}
         />
       </View>
-      {title ? (
+      {titled ? (
         <Text
           accessibilityRole="header"
           numberOfLines={1}
@@ -42,7 +43,7 @@ export function TopBar({
           {title}
         </Text>
       ) : null}
-      <View style={[styles.side, styles.trailing]}>
+      <View style={[styles.side, titled && styles.slot]}>
         {trailing.map((item) => (
           <IconButton key={item.label} {...item} />
         ))}
@@ -58,7 +59,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  trailing: { justifyContent: 'flex-end' },
-  title: { flexShrink: 1, textAlign: 'center' },
+  spread: { justifyContent: 'space-between' },
+  side: { flexDirection: 'row', alignItems: 'center' },
+  // 제목이 있으면 양옆 칸을 터치 크기로 고정해 제목이 정확히 가운데 온다.
+  slot: { width: size.touch },
+  title: { flex: 1, textAlign: 'center' },
 });

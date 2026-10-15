@@ -22,5 +22,5 @@ export function PageHeader({ title, caption }: PageHeaderProps) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: space[4], paddingBottom: space[3] },
+  header: { paddingHorizontal: space[4], paddingBottom: space[3], gap: space[1] },
 });

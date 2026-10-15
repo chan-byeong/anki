@@ -18,6 +18,8 @@ interface ButtonProps {
   // "복습 시작 · 50장"처럼 라벨 뒤에 붙는 개수.
   count?: string;
   icon?: IconComponent;
+  // ghost 버튼의 글자만 danger 색으로 칠한다("휴지통 비우기").
+  dangerText?: boolean;
   disabled?: boolean;
 }
 
@@ -29,19 +31,24 @@ export function Button({
   size = 'lg',
   count,
   icon: Icon,
+  dangerText = false,
   disabled = false,
 }: ButtonProps) {
   const { colors, text } = useTheme();
 
-  const palette = {
+  const enabled = {
     primary: { bg: colors.text, fg: colors.inverse },
     secondary: { bg: colors.surface, fg: colors.text },
     danger: { bg: colors.danger, fg: colors.inverse },
-    ghost: { bg: 'transparent', fg: colors.text },
+    ghost: { bg: 'transparent', fg: dangerText ? colors.danger : colors.text },
   }[variant];
+  const palette = disabled
+    ? { bg: variant === 'ghost' ? 'transparent' : colors.surface, fg: colors.muted }
+    : enabled;
 
-  const height = size === 'lg' ? sizeToken.button : sizeToken.touch;
-  const iconOnly = Icon !== undefined;
+  const small = size === 'sm';
+  const height = small ? sizeToken.touch : sizeToken.button;
+  const labelStyle = [text(small ? 'caption' : 'body', { weight: 'bold' }), { color: palette.fg }];
 
   return (
     <Pressable
@@ -55,21 +62,26 @@ export function Button({
         {
           backgroundColor: palette.bg,
           minHeight: height,
-          opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+          borderRadius: small ? radius.sm : radius.full,
+          opacity: pressed ? 0.7 : 1,
         },
-        iconOnly ? { width: height } : size === 'lg' ? styles.fill : styles.compact,
+        Icon
+          ? { width: sizeToken.button, minHeight: sizeToken.button }
+          : small
+            ? styles.compact
+            : styles.fill,
       ]}
     >
       {Icon ? (
         <Icon color={palette.fg} />
       ) : (
         <View style={styles.content}>
-          <Text style={[text('body', { weight: 'bold' }), { color: palette.fg }]}>{label}</Text>
+          <Text style={labelStyle}>{label}</Text>
           {count ? (
-            <Text style={[text('body', { weight: 'bold' }), { color: palette.fg }]}>
-              {' · '}
-              {count}
-            </Text>
+            <>
+              <Text style={[labelStyle, styles.sep]}>·</Text>
+              <Text style={labelStyle}>{count}</Text>
+            </>
           ) : null}
         </View>
       )}
@@ -78,12 +90,9 @@ export function Button({
 }
 
 const styles = StyleSheet.create({
-  base: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.full,
-  },
+  base: { alignItems: 'center', justifyContent: 'center' },
   fill: { alignSelf: 'stretch', paddingHorizontal: space[4] },
   compact: { alignSelf: 'flex-start', paddingHorizontal: space[3] },
-  content: { flexDirection: 'row', alignItems: 'center' },
+  content: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  sep: { opacity: 0.6 },
 });
