@@ -57,7 +57,6 @@ export function Field({
         accessibilityLabel={name}
         placeholderTextColor={colors.muted}
         cursorColor={colors.text}
-        selectionColor={colors.text}
         style={[valueStyle, styles.input]}
       />
     </Pressable>
