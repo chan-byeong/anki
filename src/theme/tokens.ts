@@ -48,9 +48,31 @@ export const onImage = {
   color: '#FFFFFF',
   muted: 'rgba(255, 255, 255, 0.8)',
   control: 'rgba(0, 0, 0, 0.4)',
-  // TODO(no-token): --scrim, --image-placeholder는 그라디언트다. RN에는 기본 그라디언트가
-  // 없어 expo-linear-gradient가 필요하다. 이를 쓰는 컴포넌트(STA-109/110)에서 정한다.
 } as const;
+
+// 그라디언트: expo-linear-gradient의 LinearGradient에 `{...scrim}`처럼 펼쳐 쓴다.
+interface GradientToken {
+  colors: readonly [string, string, ...string[]];
+  locations?: readonly [number, number, ...number[]];
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
+// --scrim: linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0))
+export const scrim: GradientToken = {
+  colors: ['rgba(0, 0, 0, 0.82)', 'rgba(0, 0, 0, 0)'],
+  start: { x: 0, y: 1 },
+  end: { x: 0, y: 0 },
+};
+
+// --image-placeholder: linear-gradient(165deg, #C9CCD3 0%, #8E939D 55%, #4A4E57 100%)
+// 165deg는 아래쪽에서 오른쪽으로 15도 기운 방향이라 (0.37, 0.02) → (0.63, 0.98)로 근사한다.
+export const imagePlaceholder: GradientToken = {
+  colors: ['#C9CCD3', '#8E939D', '#4A4E57'],
+  locations: [0, 0.55, 1],
+  start: { x: 0.37, y: 0.02 },
+  end: { x: 0.63, y: 0.98 },
+};
 
 export const fonts = {
   // KR 글꼴이 기본이고 일본어(lang="ja") 텍스트만 JP 글꼴을 명시해서 쓴다.
