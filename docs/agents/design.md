@@ -59,6 +59,30 @@ Planned screen → route mapping (adjust as routes are built, and keep this tabl
 - **Use the component names from `Components.dc.html`**: `Button`, `IconButton`, `Segmented`, `Field`, `TopBar`, `PageHeader`, `ListRow`, `ListSection`, `Sheet`, `StatusDot`, `Notice`, `Toast`, `RatingMark`. Variants drawn side by side become props. Items under "묶지 않은 후보" are not settled; don't build them as shared components yet.
 - **Labels come from the artboard and `CONTEXT.md`.** Copy UI text as drawn. Don't drift to terms the glossary avoids.
 
+## Shared component props: accessibility and ref
+
+Shared components in `src/components/` follow two rules so that callers don't have to reopen a component to add one more prop.
+
+**Accessibility props.** A component that renders a focusable element (`Pressable`, `TextInput`) or a block read as one item takes React Native's `AccessibilityProps` through `InheritedA11yProps` (`src/components/a11y.ts`) and spreads them onto that element.
+
+- Don't inherit `PressableProps` or `ViewProps` wholesale: `style` would bypass the design tokens, and `onPress`/`disabled` would clash with the component's own props.
+- Put the values the component fixes (role, label, state) _after_ the spread, and leave them out of the type with the `A11y*Props` groups. Each group also covers its `aria-*` aliases, because React Native reads the alias first (`aria-label` over `accessibilityLabel`, `role` over `accessibilityRole`), so a later fixed value would not win against it.
+- Props the component builds itself (Button's `accessibilityLabel` from `label` + `count`) stay as the component's own prop, outside the inherited set.
+- Whether a caller may change the role is decided per component. Today none may.
+
+**Ref.** The same components take a `ref` prop (React 19: a plain prop, no `forwardRef`) and attach it to the element that receives accessibility focus, not to an outer wrapper. It is used to move focus, e.g. Sheet's first focus and returning focus to the button that opened it.
+
+| Component | Accessibility props and `ref` go to | Fixed (not accepted) |
+|---|---|---|
+| `Button` | the `Pressable` | role, label (own `accessibilityLabel` prop instead), state |
+| `IconButton` | the `Pressable` (also via `TopBar` `trailing` items) | role, label, state |
+| `ListRow` | the row body: `Pressable` with `onPress`, else `View`; not the trailing button | role |
+| `Field` | the `TextInput`. `ref` is a `RefObject` only: the label tap focuses the input through it | role, label |
+| `Segmented` | props: the `radiogroup` `View`. `ref`: the selected option | role, label |
+| `Notice` | the text block read as one item, not the action button | role, label, live region |
+
+Display-only components (`PageHeader`, `ListSection`, `StatusDot`, `RatingMark`, `Toast`) and `TopBar` (built from `IconButton`) don't take these yet. Their meaning is fixed and nothing needs to change it; open them with the same rules when a caller does.
+
 ## HTML → React Native
 
 Artboards are HTML/CSS. Translate, don't paste:

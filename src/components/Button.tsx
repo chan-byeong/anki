@@ -1,13 +1,17 @@
+import type { Ref } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { radius, size as sizeToken, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import type { A11yLabelProps, A11yRoleProps, A11yStateProps, InheritedA11yProps } from './a11y';
 import type { IconComponent } from './icons';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 export type ButtonSize = 'lg' | 'sm';
 
-interface ButtonProps {
+interface ButtonProps extends InheritedA11yProps<A11yRoleProps | A11yLabelProps | A11yStateProps> {
+  // 접근성 포커스를 보낼 때 쓴다(Sheet 첫 포커스, 닫힌 뒤 트리거로 복귀).
+  ref?: Ref<View>;
   // 아이콘만 있는 버튼일 때는 접근성 라벨로만 쓰인다.
   label: string;
   // 화면 글자와 다른 이름이 필요할 때("懐かしい 복구"). 없으면 label(+count)을 읽는다.
@@ -24,6 +28,7 @@ interface ButtonProps {
 }
 
 export function Button({
+  ref,
   label,
   accessibilityLabel,
   onPress,
@@ -33,6 +38,7 @@ export function Button({
   icon: Icon,
   dangerText = false,
   disabled = false,
+  ...a11y
 }: ButtonProps) {
   const { colors, text } = useTheme();
 
@@ -52,6 +58,8 @@ export function Button({
 
   return (
     <Pressable
+      {...a11y}
+      ref={ref}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (count ? `${label} ${count}` : label)}
       accessibilityState={{ disabled }}

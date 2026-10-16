@@ -1,9 +1,16 @@
+import type { Ref } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { radius, size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import type { A11yLabelProps, A11yRoleProps, InheritedA11yProps } from './a11y';
 
-interface SegmentedProps<T extends string> {
+// 접근성 프롭은 묶음(radiogroup)에 붙는다.
+interface SegmentedProps<T extends string> extends InheritedA11yProps<
+  A11yRoleProps | A11yLabelProps
+> {
+  // 묶음은 포커스를 받지 않으므로 지금 선택된 항목을 가리킨다.
+  ref?: Ref<View>;
   options: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
@@ -14,16 +21,19 @@ interface SegmentedProps<T extends string> {
 }
 
 export function Segmented<T extends string>({
+  ref,
   options,
   value,
   onChange,
   width,
   label,
+  ...a11y
 }: SegmentedProps<T>) {
   const { colors, text } = useTheme();
 
   return (
     <View
+      {...a11y}
       accessibilityRole="radiogroup"
       accessibilityLabel={label}
       style={[styles.group, { backgroundColor: colors.surface, width }]}
@@ -33,6 +43,7 @@ export function Segmented<T extends string>({
         return (
           <Pressable
             key={option.value}
+            ref={checked ? ref : undefined}
             accessibilityRole="radio"
             accessibilityState={{ checked }}
             onPress={() => !checked && onChange(option.value)}
