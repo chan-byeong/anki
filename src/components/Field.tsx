@@ -3,18 +3,22 @@ import { Pressable, StyleSheet, Text, TextInput, type TextInputProps } from 'rea
 
 import { space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import type { A11yLabelProps, A11yRoleProps, InheritedA11yProps } from './a11y';
 
-interface FieldProps extends Pick<
-  TextInputProps,
-  | 'value'
-  | 'onChangeText'
-  | 'placeholder'
-  | 'multiline'
-  | 'returnKeyType'
-  | 'onSubmitEditing'
-  | 'autoFocus'
-  | 'blurOnSubmit'
-> {
+interface FieldProps
+  extends
+    Pick<
+      TextInputProps,
+      | 'value'
+      | 'onChangeText'
+      | 'placeholder'
+      | 'multiline'
+      | 'returnKeyType'
+      | 'onSubmitEditing'
+      | 'autoFocus'
+      | 'blurOnSubmit'
+    >,
+    InheritedA11yProps<A11yRoleProps | A11yLabelProps> {
   label: string;
   size?: 'title' | 'body';
   // 선택 입력이면 이름표 뒤에 "(선택)"이 붙는다.
@@ -23,8 +27,9 @@ interface FieldProps extends Pick<
   ja?: boolean;
   // 목록의 첫 칸은 위 여백이 좁다.
   first?: boolean;
-  // 완료 키로 다음 칸으로 넘어갈 때 호출 측이 잡는 자리.
-  inputRef?: RefObject<TextInput | null>;
+  // 완료 키로 다음 칸으로 넘어갈 때 호출 측이 잡는 자리. 이름표를 눌러도 이 ref로 입력에 들어가므로
+  // 함수 ref는 받지 않는다.
+  ref?: RefObject<TextInput | null>;
 }
 
 export function Field({
@@ -33,7 +38,7 @@ export function Field({
   optional = false,
   ja = false,
   first = false,
-  inputRef,
+  ref: inputRef,
   ...input
 }: FieldProps) {
   const { colors, text } = useTheme();

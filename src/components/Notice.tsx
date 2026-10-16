@@ -1,13 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, type Ref } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { radius, size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import type { A11yLabelProps, A11yLiveProps, A11yRoleProps, InheritedA11yProps } from './a11y';
 import { AlertCircleIcon, type IconComponent } from './icons';
 
 export type NoticeTone = 'info' | 'warn' | 'danger';
 
-interface NoticeProps {
+// 접근성 프롭과 ref는 한 덩어리로 읽히는 글자 묶음에 붙는다. 행동 버튼은 따로다.
+interface NoticeProps extends InheritedA11yProps<A11yRoleProps | A11yLabelProps | A11yLiveProps> {
+  ref?: Ref<View>;
   tone?: NoticeTone;
   title: string;
   body?: string;
@@ -20,12 +23,14 @@ interface NoticeProps {
 }
 
 export function Notice({
+  ref,
   tone = 'info',
   title,
   body,
   action,
   line = false,
   icon: Icon = AlertCircleIcon,
+  ...a11y
 }: NoticeProps) {
   const { colors, text } = useTheme();
   const spoken = body ? `${title}. ${body}` : title;
@@ -49,6 +54,8 @@ export function Notice({
       </View>
       {/* 글자 덩어리만 하나로 읽히게 묶어, 옆의 행동 버튼은 따로 눌린다. */}
       <View
+        {...a11y}
+        ref={ref}
         accessible
         accessibilityRole={tone === 'danger' ? 'alert' : undefined}
         accessibilityLiveRegion={tone === 'danger' ? 'assertive' : 'polite'}

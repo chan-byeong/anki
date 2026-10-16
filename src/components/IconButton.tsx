@@ -1,12 +1,18 @@
-import { Pressable, StyleSheet } from 'react-native';
+import type { Ref } from 'react';
+import { Pressable, StyleSheet, type View } from 'react-native';
 
 import { radius, size } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import type { A11yLabelProps, A11yRoleProps, A11yStateProps, InheritedA11yProps } from './a11y';
 import type { IconComponent } from './icons';
 
 export type IconButtonTone = 'text' | 'muted';
 
-export interface IconButtonProps {
+export interface IconButtonProps extends InheritedA11yProps<
+  A11yRoleProps | A11yLabelProps | A11yStateProps
+> {
+  // 시트를 여는 버튼이면 닫힌 뒤 이 ref로 포커스를 되돌린다.
+  ref?: Ref<View>;
   icon: IconComponent;
   // 아이콘만 있으므로 접근성 이름이 유일한 이름이다. 목적지까지 적는다("설정으로").
   label: string;
@@ -19,6 +25,7 @@ export interface IconButtonProps {
 }
 
 export function IconButton({
+  ref,
   icon: Icon,
   label,
   onPress,
@@ -26,6 +33,7 @@ export function IconButton({
   pressed,
   disabled = false,
   iconSize,
+  ...a11y
 }: IconButtonProps) {
   const { colors } = useTheme();
   const on = pressed === true;
@@ -33,6 +41,8 @@ export function IconButton({
 
   return (
     <Pressable
+      {...a11y}
+      ref={ref}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled, ...(pressed === undefined ? {} : { selected: pressed }) }}

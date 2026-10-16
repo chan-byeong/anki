@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import type { A11yRoleProps, InheritedA11yProps } from './a11y';
 import { Button } from './Button';
 import { ChevronRightIcon } from './icons';
 
@@ -13,7 +14,9 @@ export type ListRowTrailing =
   | { kind: 'chevron' }
   | { kind: 'button'; label: string; accessibilityLabel?: string; onPress: () => void };
 
-interface ListRowProps {
+// 접근성 프롭과 ref는 행 전체가 아니라 눌리는 본문(onPress가 없으면 본문 View)에 붙는다.
+interface ListRowProps extends InheritedA11yProps<A11yRoleProps> {
+  ref?: Ref<View>;
   title: string;
   sub?: string;
   // 일본어(lang="ja") 제목은 JP 글리프 글꼴을 쓴다.
@@ -28,6 +31,7 @@ interface ListRowProps {
 }
 
 export function ListRow({
+  ref,
   title,
   sub,
   ja = false,
@@ -36,6 +40,7 @@ export function ListRow({
   onPress,
   compact = false,
   last = false,
+  ...a11y
 }: ListRowProps) {
   const { colors, text } = useTheme();
   const minHeight = compact ? size.button : size.row;
@@ -75,6 +80,8 @@ export function ListRow({
     >
       {onPress ? (
         <Pressable
+          {...a11y}
+          ref={ref}
           accessibilityRole="button"
           onPress={onPress}
           style={({ pressed }) => [styles.main, { minHeight, opacity: pressed ? 0.6 : 1 }]}
@@ -82,7 +89,9 @@ export function ListRow({
           {body}
         </Pressable>
       ) : (
-        <View style={[styles.main, { minHeight }]}>{body}</View>
+        <View {...a11y} ref={ref} style={[styles.main, { minHeight }]}>
+          {body}
+        </View>
       )}
       {trailing?.kind === 'button' ? (
         <Button
