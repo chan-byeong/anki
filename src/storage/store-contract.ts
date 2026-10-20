@@ -53,6 +53,18 @@ export const describeStoreContract = (
         await expect(store.listCards(deck.id)).rejects.toMatchObject({ code: 'trashed' });
         await expect(store.listCards('없는 덱')).rejects.toMatchObject({ code: 'not_found' });
       });
+
+      test('이름과 발음 언어를 고치거나 없음으로 되돌려도 다시 열면 유지된다', async () => {
+        let { store } = await harness.open();
+        const deck = await store.createDeck({ name: '처음 덱', language: 'en' });
+        for (const language of ['ja', 'ko', null]) {
+          const name = `고친 덱 ${language ?? '없음'}`;
+          await store.updateDeck(deck.id, { name, language });
+          ({ store } = await harness.reopen());
+          expect(await store.getDeck(deck.id)).toEqual({ ...deck, name, language });
+          expect(await store.listDecks()).toEqual([{ ...deck, name, language }]);
+        }
+      });
     });
 
     describe('카드', () => {

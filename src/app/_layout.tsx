@@ -25,6 +25,7 @@ function ThemedStack() {
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Screen name="deck/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="deck/[id]/edit" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );
