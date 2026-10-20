@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { fireEvent, userEvent } from '@testing-library/react-native';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
@@ -7,7 +7,7 @@ import DeckScreen from '@/app/deck/[id]';
 import EditDeckScreen from '@/app/deck/[id]/edit';
 import NewDeckScreen from '@/app/deck/new';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
-import { createStore, type Store } from '@/storage/store';
+import { createStore, type Deck, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -128,5 +128,135 @@ describe('덱 폼', () => {
     await user.press(screen.getByRole('radio', { name: '한국어' }));
     await user.press(screen.getByRole('button', { name: '닫기' }));
     expect(await store.listDecks()).toEqual([deck]);
+  });
+
+  test.each(['create', 'edit'])(
+    '%s: 저장 실패 후 입력을 유지하고 다시 저장할 수 있다',
+    async (mode) => {
+      const store = newStore();
+      const deck = await store.createDeck({ name: '원래 덱', language: 'en' });
+      const save = jest
+        .spyOn(store, mode === 'create' ? 'createDeck' : 'updateDeck')
+        .mockRejectedValueOnce(new Error('disk full'));
+      await renderApp(store);
+      const user = setupUser();
+      if (mode === 'edit') await openEdit(deck.name);
+      else await user.press(screen.getByRole('button', { name: '덱 추가' }));
+      await user.clear(screen.getByLabelText('이름'));
+      await user.type(screen.getByLabelText('이름'), '재시도 덱');
+      await user.press(screen.getByRole('radio', { name: '한국어' }));
+      const label = mode === 'edit' ? '저장' : '만들기';
+      await user.press(screen.getByRole('button', { name: label }));
+
+      expect(screen.getByRole('alert')).toBeOnTheScreen();
+      expect(screen.getByLabelText('이름')).toHaveDisplayValue('재시도 덱');
+      expect(screen.getByRole('radio', { name: '한국어' })).toBeChecked();
+      expect(screen.getByRole('button', { name: label })).toBeEnabled();
+      await user.press(screen.getByRole('button', { name: label }));
+      expect(save).toHaveBeenCalledTimes(2);
+      expect((await store.listDecks()).find((item) => item.name === '재시도 덱')).toMatchObject({
+        language: 'ko',
+      });
+    },
+  );
+
+  test('같은 렌더의 연속 제출과 저장 중 재제출은 한 번만 저장한다', async () => {
+    const store = newStore();
+    const create = store.createDeck;
+    let complete!: (deck: Deck) => void;
+    const pending = new Promise<Deck>((resolve) => {
+      complete = resolve;
+    });
+    const save = jest.spyOn(store, 'createDeck').mockReturnValueOnce(pending);
+    await renderApp(store, '/deck/new');
+    const user = setupUser();
+    await user.type(screen.getByLabelText('이름'), '한 번만');
+    const input = screen.getByLabelText('이름');
+    await act(async () => {
+      input.props.onSubmitEditing();
+      input.props.onSubmitEditing();
+    });
+    expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: '영어' })).toBeDisabled();
+    await fireEvent(input, 'submitEditing');
+    expect(save).toHaveBeenCalledTimes(1);
+    await act(async () => complete(await create({ name: '한 번만', language: null })));
+    expect(await store.listDecks()).toHaveLength(1);
+  });
+
+  test.each(['missing', 'trashed'])('%s 덱은 폼을 열지 않고 돌아갈 수 있다', async (kind) => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '원래 덱' });
+    if (kind === 'trashed') await store.trashDeck(deck.id);
+    await renderApp(store, `/deck/${kind === 'missing' ? 'missing' : deck.id}/edit`);
+    expect(await screen.findByText('편집할 덱이 없어요')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('이름')).toBeNull();
+    await setupUser().press(screen.getByRole('button', { name: '돌아가기' }));
+    expect(await screen.findByRole('header', { name: '덱' })).toBeOnTheScreen();
+  });
+
+  test('조회 실패는 없는 덱과 구분하고 다시 불러올 수 있다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '원래 덱', language: 'ko' });
+    jest.spyOn(store, 'getDeck').mockRejectedValueOnce(new Error('read failed'));
+    await renderApp(store, `/deck/${deck.id}/edit`);
+    expect(await screen.findByText('덱을 불러오지 못했어요')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('이름')).toBeNull();
+    await setupUser().press(screen.getByRole('button', { name: '다시 시도' }));
+    expect(await screen.findByLabelText('이름')).toHaveDisplayValue(deck.name);
+    expect(screen.getByRole('radio', { name: '한국어' })).toBeChecked();
+  });
+
+  test('편집하는 사이 휴지통으로 간 덱은 저장할 수 없다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '원래 덱' });
+    await renderApp(store, `/deck/${deck.id}/edit`);
+    await screen.findByLabelText('이름');
+    await store.trashDeck(deck.id);
+    await setupUser().press(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('편집할 덱이 없어요')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('이름')).toBeNull();
+  });
+
+  test('다른 덱으로 이동한 뒤 도착한 이전 조회 응답은 폼을 덮지 않는다', async () => {
+    const store = newStore();
+    const first = await store.createDeck({ name: '첫 덱', language: 'en' });
+    const second = await store.createDeck({ name: '두 번째 덱', language: 'ko' });
+    let complete!: (deck: Deck) => void;
+    jest.spyOn(store, 'getDeck').mockReturnValueOnce(
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+    );
+    await renderApp(store, `/deck/${first.id}/edit`);
+    expect(screen.queryByLabelText('이름')).toBeNull();
+    await act(async () =>
+      router.replace({ pathname: '/deck/[id]/edit', params: { id: second.id } }),
+    );
+    expect(await screen.findByLabelText('이름')).toHaveDisplayValue(second.name);
+    await act(async () => complete(first));
+    expect(screen.getByLabelText('이름')).toHaveDisplayValue(second.name);
+    expect(screen.getByRole('radio', { name: '한국어' })).toBeChecked();
+  });
+
+  test('저장 도중 닫아도 완료 응답이 뒤 화면을 또 닫지 않는다', async () => {
+    const store = newStore();
+    const create = store.createDeck;
+    let complete!: (deck: Deck) => void;
+    jest.spyOn(store, 'createDeck').mockReturnValueOnce(
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+    );
+    await renderApp(store);
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: '덱 추가' }));
+    await user.type(screen.getByLabelText('이름'), '저장 요청');
+    await user.press(screen.getByRole('button', { name: '만들기' }));
+    await user.press(screen.getByRole('button', { name: '닫기' }));
+    const back = jest.spyOn(router, 'back');
+    await act(async () => complete(await create({ name: '저장 요청' })));
+    expect(back).not.toHaveBeenCalled();
+    expect(screen.getByRole('header', { name: '덱' })).toBeOnTheScreen();
   });
 });
