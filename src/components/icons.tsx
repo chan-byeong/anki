@@ -90,6 +90,21 @@ export const SettingsIcon: IconComponent = (props) => (
   </Glyph>
 );
 
+export const SearchIcon: IconComponent = ({ size = 18, ...props }) => (
+  <Glyph size={size} {...props}>
+    <Circle cx="11" cy="11" r="8" />
+    <Line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </Glyph>
+);
+
+export const ClearCircleIcon: IconComponent = ({ size = 18, ...props }) => (
+  <Glyph size={size} {...props}>
+    <Circle cx="12" cy="12" r="10" />
+    <Line x1="15" y1="9" x2="9" y2="15" />
+    <Line x1="9" y1="9" x2="15" y2="15" />
+  </Glyph>
+);
+
 export const AlertCircleIcon: IconComponent = ({ size = 18, ...props }) => (
   <Glyph size={size} {...props}>
     <Circle cx="12" cy="12" r="10" />

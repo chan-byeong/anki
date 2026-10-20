@@ -11,11 +11,42 @@ interface CardRowProps {
   back: string;
   // 복습 이력이 없는 카드의 표시. 복습일 표기는 STA-118에서 더한다.
   status: string;
+  // 검색어. 앞면·뒷면에서 일치하는 부분에 밑줄을 긋는다.
+  highlight?: string;
   onPress: () => void;
   last?: boolean;
 }
 
-export function CardRow({ front, back, status, onPress, last = false }: CardRowProps) {
+// 검색어와 일치하는 부분(대소문자 무시)만 밑줄로 구분한다. 접근성 라벨은 줄 전체를 읽으므로 글자는 그대로 둔다.
+function marked(value: string, query: string) {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return value;
+  const lower = value.toLowerCase();
+  // toLowerCase가 길이를 바꾸는 글자(İ 등)가 있으면 위치가 어긋나므로 표시하지 않는다.
+  if (lower.length !== value.length) return value;
+  const parts: React.ReactNode[] = [];
+  let from = 0;
+  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
+    if (at > from) parts.push(value.slice(from, at));
+    from = at + needle.length;
+    parts.push(
+      <Text key={at} style={styles.mark}>
+        {value.slice(at, from)}
+      </Text>,
+    );
+  }
+  parts.push(value.slice(from));
+  return parts;
+}
+
+export function CardRow({
+  front,
+  back,
+  status,
+  highlight = '',
+  onPress,
+  last = false,
+}: CardRowProps) {
   const { colors, text } = useTheme();
 
   return (
@@ -33,8 +64,8 @@ export function CardRow({ front, back, status, onPress, last = false }: CardRowP
       ]}
     >
       <View style={styles.texts}>
-        <Text style={text('body', { weight: 'bold' })}>{front}</Text>
-        <Text style={[text('caption'), { color: colors.muted }]}>{back}</Text>
+        <Text style={text('body', { weight: 'bold' })}>{marked(front, highlight)}</Text>
+        <Text style={[text('caption'), { color: colors.muted }]}>{marked(back, highlight)}</Text>
       </View>
       <Text style={[text('caption'), { color: colors.muted }]}>{status}</Text>
     </Pressable>
@@ -51,4 +82,5 @@ const styles = StyleSheet.create({
     gap: space[3],
   },
   texts: { flex: 1, gap: space[1] },
+  mark: { textDecorationLine: 'underline' },
 });
