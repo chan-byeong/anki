@@ -104,6 +104,21 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     announce.mockRestore();
   });
 
+  test('뒷면이 들어올 자리는 열리기 전부터 라이브 영역이라 웹에서도 열림을 읽어 준다', async () => {
+    const { store, deck } = await seed();
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+    const answer = screen.getByTestId('review-answer');
+
+    expect(answer.props['aria-live']).toBe('polite');
+    expect(screen.queryByText('사과')).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: '정답 확인' }));
+
+    expect(screen.getByTestId('review-answer')).toBe(answer);
+    expect(screen.getByTestId('review-answer')).toHaveTextContent('사과');
+  });
+
   test('복습할 카드가 없는 덱의 복습 화면은 덱 상세로 보낸다', async () => {
     const store = newStore();
     const deck = await store.createDeck({ name: '빈 덱' });

@@ -74,14 +74,17 @@ function ReviewCard({ card, insetBottom }: ReviewCardProps) {
       <View accessible accessibilityLabel={`앞면 ${card.front}`}>
         <Text style={[text('display', { weight: 'bold' }), styles.center]}>{card.front}</Text>
       </View>
-      {revealed ? (
-        <>
-          <View aria-hidden style={[styles.divider, { backgroundColor: colors.line }]} />
-          <View accessible accessibilityLabel={`뒷면 ${card.back}`}>
-            <Text style={[text('title', { weight: 'bold' }), styles.center]}>{card.back}</Text>
-          </View>
-        </>
-      ) : null}
+      {/* 열리기 전부터 있는 라이브 영역이다. 내용이 들어오면 웹 스크린 리더가 읽는다(웹은 announceForAccessibility가 동작하지 않는다). */}
+      <View testID="review-answer" aria-live="polite" style={revealed ? styles.answer : undefined}>
+        {revealed ? (
+          <>
+            <View aria-hidden style={[styles.divider, { backgroundColor: colors.line }]} />
+            <View accessible accessibilityLabel={`뒷면 ${card.back}`}>
+              <Text style={[text('title', { weight: 'bold' }), styles.center]}>{card.back}</Text>
+            </View>
+          </>
+        ) : null}
+      </View>
     </ScrollView>
   );
 
@@ -136,11 +139,11 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    gap: space[4],
     paddingHorizontal: space[4],
     paddingTop: space[5],
     paddingBottom: space[4],
   },
+  answer: { marginTop: space[4], gap: space[4] },
   center: { textAlign: 'center' },
   divider: { alignSelf: 'center', width: 32, height: 1 },
   footer: {
