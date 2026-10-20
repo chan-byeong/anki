@@ -120,9 +120,11 @@ export const describeStoreContract = (
         const deck = await store.createDeck({ name: '영어 단어' });
         const card = await store.createCard(deck.id, { front: 'apple', back: '사과' });
 
-        await expect(store.createCard(deck.id, { front: ' ', back: '사과' })).rejects.toMatchObject({
-          code: 'invalid',
-        });
+        await expect(store.createCard(deck.id, { front: ' ', back: '사과' })).rejects.toMatchObject(
+          {
+            code: 'invalid',
+          },
+        );
         await expect(store.updateCard(card.id, { back: '' })).rejects.toMatchObject({
           code: 'invalid',
         });
@@ -339,6 +341,30 @@ export const describeStoreContract = (
         await store.trashCard(card.id);
 
         await expect(store.listReviewHistory(card.id)).rejects.toMatchObject({ code: 'trashed' });
+      });
+    });
+
+    describe('평가하지 않은 카드 수', () => {
+      test('살아 있는 덱마다 평가 기록이 없는 살아 있는 카드를 센다', async () => {
+        const { store } = await harness.open();
+        const words = await store.createDeck({ name: '영어 단어' });
+        const empty = await store.createDeck({ name: '빈 덱' });
+        await store.createCard(words.id, { front: 'apple', back: '사과' });
+        const rated = await store.createCard(words.id, { front: 'pear', back: '배' });
+        const trashed = await store.createCard(words.id, { front: 'grape', back: '포도' });
+        await store.rateCard(rated.id, { id: 'review-1', rating: 'know', hintUsed: false });
+        await store.trashCard(trashed.id);
+
+        expect(await store.countUnreviewedCards()).toEqual({ [words.id]: 1, [empty.id]: 0 });
+      });
+
+      test('휴지통에 있는 덱은 빠진다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        await store.trashDeck(deck.id);
+
+        expect(await store.countUnreviewedCards()).toEqual({});
       });
     });
   });
