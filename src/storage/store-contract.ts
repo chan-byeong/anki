@@ -356,6 +356,43 @@ export const describeStoreContract = (
       });
     });
 
+    describe('평가하지 않은 카드 목록', () => {
+      test('덱에서 평가 기록이 없는 살아 있는 카드를 만든 순서대로 돌려준다', async () => {
+        const { store } = await harness.open();
+        const words = await store.createDeck({ name: '영어 단어' });
+        const other = await store.createDeck({ name: '개발 지식' });
+        const apple = await store.createCard(words.id, { front: 'apple', back: '사과' });
+        const rated = await store.createCard(words.id, { front: 'pear', back: '배' });
+        const trashed = await store.createCard(words.id, { front: 'grape', back: '포도' });
+        const grape = await store.createCard(words.id, { front: 'plum', back: '자두' });
+        await store.createCard(other.id, { front: 'git', back: '버전 관리' });
+        await store.rateCard(rated.id, { id: 'review-1', rating: 'know', hintUsed: false });
+        await store.trashCard(trashed.id);
+
+        const cards = await store.listUnreviewedCards(words.id);
+
+        expect(cards.map((card) => card.id)).toEqual([apple.id, grape.id]);
+      });
+
+      test('카드가 없는 덱은 빈 목록이다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '빈 덱' });
+
+        expect(await store.listUnreviewedCards(deck.id)).toEqual([]);
+      });
+
+      test('덱이 없거나 휴지통에 있으면 거부한다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        await store.trashDeck(deck.id);
+
+        await expect(store.listUnreviewedCards(deck.id)).rejects.toMatchObject({ code: 'trashed' });
+        await expect(store.listUnreviewedCards('none')).rejects.toMatchObject({
+          code: 'not_found',
+        });
+      });
+    });
+
     describe('평가하지 않은 카드 수', () => {
       test('살아 있는 덱마다 평가 기록이 없는 살아 있는 카드를 센다', async () => {
         const { store } = await harness.open();

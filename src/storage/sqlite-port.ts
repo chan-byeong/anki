@@ -112,6 +112,16 @@ const tablesOn = (db: SqlExecutor): PortTables => ({
           [deckId],
         ),
       ),
+    listUnreviewedAliveByDeck: async (deckId) =>
+      plainAll(
+        await db.all<CardRow>(
+          `SELECT * FROM cards
+           WHERE deck_id = ? AND deleted_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM reviews WHERE card_id = cards.id)
+           ORDER BY created_at, id`,
+          [deckId],
+        ),
+      ),
     countUnreviewedAliveByDeck: async () =>
       plainAll(
         await db.all<{ deck_id: string; count: number }>(
