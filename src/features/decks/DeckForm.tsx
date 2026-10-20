@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CheckIcon, Field, Notice, TopBar } from '@/components';
+import { StoreError, type Deck } from '@/storage/store';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
@@ -71,15 +72,18 @@ export function DeckFormFrame({
   );
 }
 
-export function DeckForm() {
+// 조회가 끝나고 마운트할 때 저장된 값으로 한 번만 초기화한다.
+export function DeckForm({ deck }: { deck?: Deck }) {
   const store = useStore();
   const { colors, text } = useTheme();
-  const [name, setName] = useState('');
-  const [language, setLanguage] = useState<string | null>(null);
+  const [name, setName] = useState(deck?.name ?? '');
+  const [language, setLanguage] = useState(deck?.language ?? null);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [missing, setMissing] = useState(false);
   const submitting = useRef(false);
   const active = useRef(true);
+  const editing = deck !== undefined;
   const empty = name.trim() === '';
 
   useFocusEffect(
@@ -99,24 +103,31 @@ export function DeckForm() {
     setFailed(false);
     try {
       const input = { name: name.trim(), language };
-      await store.createDeck(input);
+      if (deck) await store.updateDeck(deck.id, input);
+      else await store.createDeck(input);
       // 저장 도중 닫았다면 뒤에 있는 화면까지 되돌리지 않는다.
       if (active.current) closeDeckForm();
-    } catch {
+    } catch (error) {
       if (!active.current) return;
-      setFailed(true);
+      if (error instanceof StoreError && (error.code === 'not_found' || error.code === 'trashed')) {
+        setMissing(true);
+      } else {
+        setFailed(true);
+      }
       submitting.current = false;
       setSaving(false);
     }
   };
 
+  if (missing) return <DeckFormUnavailable />;
+
   return (
     <DeckFormFrame
-      editing={false}
+      editing={editing}
       footer={
         <>
           <Button
-            label={saving ? '저장 중…' : '만들기'}
+            label={saving ? '저장 중…' : editing ? '저장' : '만들기'}
             onPress={save}
             disabled={empty || saving}
           />
@@ -125,7 +136,7 @@ export function DeckForm() {
               accessibilityLiveRegion="polite"
               style={[text('caption'), styles.hint, { color: colors.muted }]}
             >
-              이름을 적으면 만들 수 있어요
+              {editing ? '이름을 적으면 저장할 수 있어요' : '이름을 적으면 만들 수 있어요'}
             </Text>
           ) : null}
         </>
@@ -135,7 +146,7 @@ export function DeckForm() {
         label="이름"
         size="title"
         first
-        autoFocus
+        autoFocus={!editing}
         editable={!saving}
         value={name}
         onChangeText={setName}
@@ -171,14 +182,33 @@ export function DeckForm() {
             </Pressable>
           );
         })}
+        {/* 외부에서 저장한 언어도 다른 항목을 고르기 전까지 그대로 보존한다. */}
+        {language !== null && !languages.some((option) => option.value === language) ? (
+          <Text style={[text('caption'), styles.description, { color: colors.muted }]}>
+            현재 발음 언어: {language}
+          </Text>
+        ) : null}
       </View>
       {failed ? (
         <Notice
           tone="danger"
-          title="덱을 만들지 못했어요"
+          title={editing ? '덱을 저장하지 못했어요' : '덱을 만들지 못했어요'}
           body="입력한 내용은 그대로예요. 잠시 뒤 다시 해 주세요."
         />
       ) : null}
+    </DeckFormFrame>
+  );
+}
+
+export function DeckFormUnavailable({ retry }: { retry?: () => void }) {
+  return (
+    <DeckFormFrame editing footer={<Button label="돌아가기" onPress={closeDeckForm} />}>
+      <Notice
+        tone={retry ? 'danger' : 'info'}
+        title={retry ? '덱을 불러오지 못했어요' : '편집할 덱이 없어요'}
+        body={retry ? '잠시 뒤 다시 해 주세요.' : '덱이 없거나 휴지통에 있어요.'}
+        action={retry ? { label: '다시 시도', onPress: retry } : undefined}
+      />
     </DeckFormFrame>
   );
 }
