@@ -100,6 +100,11 @@ export interface Store {
   listDecks(): Promise<Deck[]>;
   /** 살아 있는 덱만. 휴지통의 덱은 listTrash로 본다. */
   getDeck(deckId: string): Promise<Deck | null>;
+  /**
+   * 살아 있는 덱마다 평가를 한 번도 받지 않은 살아 있는 카드 수. 카드가 없는 덱은 0이다.
+   * 복습일을 계산하지 않는다. 신규 카드는 바로 복습일이 되므로 오늘 복습할 카드의 일부다.
+   */
+  countUnreviewedCards(): Promise<Record<string, number>>;
   updateDeck(deckId: string, patch: DeckPatch): Promise<Deck>;
   /** 덱과 그 시점에 휴지통에 없는 카드에 같은 op ID를 남긴다(ADR 0011). */
   trashDeck(deckId: string): Promise<void>;
@@ -306,6 +311,17 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   async getDeck(deckId) {
     const row = await port.decks.get(deckId);
     return row !== null && isAlive(row) ? toDeck(row) : null;
+  },
+
+  async countUnreviewedCards() {
+    return port.transaction(async (tx) => {
+      const counts: Record<string, number> = {};
+      for (const deck of await tx.decks.listAlive()) counts[deck.id] = 0;
+      for (const { deck_id, count } of await tx.cards.countUnreviewedAliveByDeck()) {
+        if (deck_id in counts) counts[deck_id] = count;
+      }
+      return counts;
+    });
   },
 
   async updateDeck(deckId, patch) {
