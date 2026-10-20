@@ -46,7 +46,11 @@ export default function EditCardScreen() {
   );
 }
 
-function EditForm({ card }: { card: Card }) {
+interface EditFormProps {
+  card: Card;
+}
+
+function EditForm({ card }: EditFormProps) {
   const store = useStore();
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();

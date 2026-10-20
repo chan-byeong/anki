@@ -1,4 +1,4 @@
-import { searchCards } from '../search-cards';
+import { searchCards, splitMatches } from '../search-cards';
 
 const cards = [
   { id: '1', front: 'Apple', back: '사과', memo: '과일' },
@@ -41,5 +41,27 @@ describe('searchCards', () => {
 
   test('조합형과 완성형 한글을 같은 글자로 본다', () => {
     expect(idsOf('사과'.normalize('NFD'))).toEqual(['1']);
+  });
+});
+
+describe('splitMatches', () => {
+  test('검색어와 일치하는 부분을 대소문자 구분 없이 나눈다', () => {
+    expect(splitMatches('Apple pie, apple', 'APPLE')).toEqual([
+      { text: 'Apple', match: true },
+      { text: ' pie, ', match: false },
+      { text: 'apple', match: true },
+    ]);
+  });
+
+  test('검색어가 비었거나 일치하는 곳이 없으면 통째로 돌려준다', () => {
+    expect(splitMatches('apple', '  ')).toEqual([{ text: 'apple', match: false }]);
+    expect(splitMatches('apple', 'zzz')).toEqual([{ text: 'apple', match: false }]);
+  });
+
+  test('조합형 한글도 일치하는 부분을 찾는다', () => {
+    expect(splitMatches('사과 주스'.normalize('NFD'), '사과')).toEqual([
+      { text: '사과', match: true },
+      { text: ' 주스', match: false },
+    ]);
   });
 });
