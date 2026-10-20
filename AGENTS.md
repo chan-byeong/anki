@@ -46,6 +46,27 @@ Docs: https://docs.expo.dev/eas/index.md
 
 Issues are tracked in the Linear project `anki`, via the `orca-linear` skill. See `docs/agents/issue-tracker.md`.
 
+**Create an issue before starting any work.** Before writing code or changing files:
+
+1. Search the `anki` project for an existing issue covering the task; reuse it if found.
+2. Otherwise create one in the `STA` team and `anki` project with a clear title and the goal/scope.
+3. Work against that issue (`STA-123`) and reference its ID in branch names and commits.
+4. When done, post a completion comment (with the PR link) and move the issue to its next state.
+
+Skip this only for trivial changes (typo fixes, formatting) or when the user explicitly says not to.
+
+### Core tickets (hand-coding)
+
+The user hand-writes the core logic to keep a feel for the codebase. Which tickets are core is decided up front at triage, not by the agent at implementation time. Labels and vocabulary: `docs/agents/issue-tracker.md`.
+
+When asked to implement a ticket, read its labels first:
+
+- **`ready-for-agent`**: implement it.
+- **`core`**: do NOT write the implementation. Stop, say the ticket is `core`, and ask which cycle step to start from: research → grilling → ADR → tdd → review. In this mode, only give hints, propose test cases, answer questions, and review code the user wrote. Code outside the part the ticket marks as "hand-code" (UI, config, wiring) may still be implemented.
+- Neither label: ask the user to triage it before starting.
+
+Override only when the user explicitly says to write it this time. If grilling shows a core ticket's spec assumption is wrong, update the ticket and record the reason in an ADR.
+
 ### Domain docs
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
