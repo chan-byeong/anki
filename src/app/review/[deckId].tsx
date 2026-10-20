@@ -62,6 +62,7 @@ function ReviewCard({ card, insetBottom }: ReviewCardProps) {
   const { colors, text } = useTheme();
   const deckName = useDeckName(card.deckId);
   const [revealed, setRevealed] = useState(false);
+  const frontId = `review-front-${card.id}`;
 
   const reveal = () => {
     setRevealed(true);
@@ -72,7 +73,9 @@ function ReviewCard({ card, insetBottom }: ReviewCardProps) {
   const content = (
     <ScrollView testID="review-scroll" contentContainerStyle={styles.content}>
       <View accessible accessibilityLabel={`앞면 ${card.front}`}>
-        <Text style={[text('display', { weight: 'bold' }), styles.center]}>{card.front}</Text>
+        <Text nativeID={frontId} style={[text('display', { weight: 'bold' }), styles.center]}>
+          {card.front}
+        </Text>
       </View>
       {/* 열리기 전부터 있는 라이브 영역이다. 내용이 들어오면 웹 스크린 리더가 읽는다(웹은 announceForAccessibility가 동작하지 않는다). */}
       <View testID="review-answer" aria-live="polite" style={revealed ? styles.answer : undefined}>
@@ -100,6 +103,8 @@ function ReviewCard({ card, insetBottom }: ReviewCardProps) {
           accessibilityRole={revealed ? undefined : 'button'}
           accessibilityLabel={revealed ? undefined : '정답 확인'}
           accessibilityValue={revealed ? undefined : { text: `앞면 ${card.front}` }}
+          // 웹은 accessibilityValue 객체를 DOM에 옮기지 않으므로 앞면 글자를 버튼의 설명으로 잇는다.
+          aria-describedby={revealed ? undefined : frontId}
           disabled={revealed}
           onPress={reveal}
           style={[styles.card, { backgroundColor: colors.surface }]}

@@ -88,6 +88,17 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     expect(card.props.accessibilityValue).toEqual({ text: '앞면 apple' });
   });
 
+  test('웹에서는 앞면 글자를 버튼의 설명으로 이어 준다', async () => {
+    const { store, deck } = await seed();
+    await renderApp(store, `/review/${deck.id}`);
+
+    const card = screen.getByRole('button', { name: '정답 확인' });
+    const front = screen.getByText('apple');
+
+    expect(front.props.nativeID).toEqual(expect.any(String));
+    expect(card.props['aria-describedby']).toBe(front.props.nativeID);
+  });
+
   test('카드를 누르면 뒷면이 열리고 열렸다고 알려 준다', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const { store, deck } = await seed();
