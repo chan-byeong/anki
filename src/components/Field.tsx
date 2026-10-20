@@ -17,6 +17,7 @@ interface FieldProps
       | 'onSubmitEditing'
       | 'autoFocus'
       | 'blurOnSubmit'
+      | 'editable'
     >,
     InheritedA11yProps<A11yRoleProps | A11yLabelProps> {
   label: string;
