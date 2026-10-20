@@ -1,14 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Field, Notice, TopBar } from '@/components';
@@ -31,7 +23,8 @@ export default function NewCardScreen() {
   const [added, setAdded] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
-  const frontInput = useRef<TextInput>(null);
+  // 저장할 때마다 바꿔서 입력창을 새로 만든다. multiline 입력창은 값을 비워도 긴 글로 커진 높이가 남는다.
+  const [formKey, setFormKey] = useState(0);
   const canSave = front.trim() !== '' && back.trim() !== '' && !saving;
 
   const save = async () => {
@@ -48,7 +41,7 @@ export default function NewCardScreen() {
       setFront('');
       setBack('');
       setMemo('');
-      frontInput.current?.focus();
+      setFormKey((key) => key + 1);
     } catch {
       setFailed(true);
     } finally {
@@ -88,7 +81,7 @@ export default function NewCardScreen() {
           </Text>
         ) : null}
         <Field
-          ref={frontInput}
+          key={`front-${formKey}`}
           label="앞면"
           size="title"
           first
@@ -98,8 +91,16 @@ export default function NewCardScreen() {
           value={front}
           onChangeText={setFront}
         />
-        <Field label="뒷면" multiline placeholder="뜻이나 답" value={back} onChangeText={setBack} />
         <Field
+          key={`back-${formKey}`}
+          label="뒷면"
+          multiline
+          placeholder="뜻이나 답"
+          value={back}
+          onChangeText={setBack}
+        />
+        <Field
+          key={`memo-${formKey}`}
           label="메모"
           optional
           multiline
