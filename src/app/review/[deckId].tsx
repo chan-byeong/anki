@@ -88,21 +88,21 @@ function ReviewCard({ card, insetBottom }: ReviewCardProps) {
   return (
     <>
       <View style={styles.main}>
-        {revealed ? (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>{content}</View>
-        ) : (
+        {/* 공개 전후로 같은 요소를 유지한다. 감싸는 요소가 바뀌면 스크롤 영역이 다시 만들어져 읽던 위치가 사라진다. */}
+        <Pressable
           // 카드 전체가 버튼이다. 스크롤은 그대로 되고, 짧게 누르면 열린다.
           // 앞면은 버튼 이름에 덧붙이지 않고 값으로 읽혀서 이름은 "정답 확인"으로 고정된다.
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="정답 확인"
-            accessibilityValue={{ text: `앞면 ${card.front}` }}
-            onPress={reveal}
-            style={[styles.card, { backgroundColor: colors.surface }]}
-          >
-            {content}
-          </Pressable>
-        )}
+          // 열린 뒤에는 버튼이 아니므로 안쪽 앞면·뒷면을 각각 읽는다.
+          accessible={!revealed}
+          accessibilityRole={revealed ? undefined : 'button'}
+          accessibilityLabel={revealed ? undefined : '정답 확인'}
+          accessibilityValue={revealed ? undefined : { text: `앞면 ${card.front}` }}
+          disabled={revealed}
+          onPress={reveal}
+          style={[styles.card, { backgroundColor: colors.surface }]}
+        >
+          {content}
+        </Pressable>
         <Text style={[text('caption'), styles.deck, { color: colors.muted }]} pointerEvents="none">
           {deckName}
         </Text>

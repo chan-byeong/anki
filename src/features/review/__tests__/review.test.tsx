@@ -148,6 +148,19 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     expect(screen.getByTestId('review-scroll')).toBeOnTheScreen();
   });
 
+  test('정답을 열어도 스크롤 영역이 다시 만들어지지 않아 읽던 위치가 유지된다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '긴 카드' });
+    await store.createCard(deck.id, { front: LONG_FRONT, back: LONG_BACK });
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+    const before = screen.getByTestId('review-scroll');
+
+    await user.press(screen.getByRole('button', { name: '정답 확인' }));
+
+    expect(screen.getByTestId('review-scroll')).toBe(before);
+  });
+
   test('닫기를 누르면 이전 화면으로 돌아간다', async () => {
     const { store } = await seed();
     await renderApp(store, '/');
