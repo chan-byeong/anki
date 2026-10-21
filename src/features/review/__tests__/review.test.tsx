@@ -18,9 +18,10 @@ jest.mock(
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
 
+// 훅은 대기열의 오늘을 Date.now()로 만든다. 평가한 날과 같은 날이 되도록 시계를 지금에서 시작한다.
 const newStore = (): Store =>
   createStore(createMemoryPort(createMemoryBacking()), {
-    now: createTestClock().now,
+    now: createTestClock(Date.now()).now,
     newId: createTestIds(),
   });
 

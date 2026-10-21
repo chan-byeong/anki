@@ -6,6 +6,7 @@ import { act, renderRouter, screen } from 'expo-router/testing-library';
 import NewCardScreen from '@/app/card/new';
 import DeckScreen from '@/app/deck/[id]';
 import HomeScreen from '@/app/index';
+import { todayCountOf } from '@/features/decks/use-deck-list';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
@@ -199,7 +200,7 @@ describe('카드 추가', () => {
     await user.press(screen.getByRole('button', { name: '저장' }));
     await screen.findByText('방금 추가 · apple');
 
-    expect((await store.countUnreviewedCards())[deck.id]).toBe(1);
+    expect((await todayCountOf(store))[deck.id]).toBe(1);
   });
 
   test('긴 앞면과 뒷면도 그대로 저장된다', async () => {
