@@ -1,3 +1,5 @@
+import { studyDayOf } from '@/utils/study-day';
+
 import type { CardRow, DeckRow, Port, PortTables, ReviewRow } from './port';
 
 // 도메인 동작과 규칙을 한 번만 두는 곳(ADR 0010). 동작 하나가 트랜잭션 하나이고,
@@ -35,6 +37,8 @@ export type Review = {
   studyDay: number;
   ratedAt: number;
 };
+
+export type CardWithHistory = { card: Card; history: Review[] };
 
 export type Trash = {
   decks: (Deck & { deletedAt: number })[];
@@ -116,6 +120,12 @@ export interface Store {
   /** 덱이 없거나 휴지통에 있으면 거부한다. 빈 덱과 구분하기 위해서다. */
   listCards(deckId: string): Promise<Card[]>;
   /**
+   * 덱의 살아 있는 카드를 만든 순서대로, 카드마다 학습 이력(평가 시각 순서)과 함께 한 트랜잭션에서 읽는다.
+   * 이력이 없는 카드의 history는 빈 배열이다. 복습일이나 대기열은 계산하지 않는다(ADR 0010).
+   * 덱이 없거나 휴지통에 있으면 거부한다.
+   */
+  listCardsWithHistory(deckId: string): Promise<CardWithHistory[]>;
+  /**
    * 덱에서 평가를 한 번도 받지 않은 살아 있는 카드를 만든 순서대로. countUnreviewedCards의 목록판이다.
    * 복습일을 계산하지 않는다. 덱이 없거나 휴지통에 있으면 거부한다.
    */
@@ -147,14 +157,6 @@ export interface Store {
   /** 카드가 살아 있지 않으면 거부한다. getCard와 같은 기준이다. */
   listReviewHistory(cardId: string): Promise<Review[]>;
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// 기기의 현재 날짜를 1970-01-01부터 센 일수로(ADR 0013).
-const studyDayOf = (ms: number): number => {
-  const date = new Date(ms);
-  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
-};
 
 const toDeck = (row: DeckRow): Deck => ({
   id: row.id,
@@ -397,6 +399,19 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
       await findAliveDeck(tx, deckId);
       return (await tx.cards.listUnreviewedAliveByDeck(deckId)).map(toCard);
     });
+  },
+
+  async listCardsWithHistory(deckId) {
+    const cardWithHistory: CardWithHistory[] = [];
+    await port.transaction(async (tx) => {
+      await findAliveDeck(tx, deckId);
+      const liveCards = (await tx.cards.listAliveByDeck(deckId)).map(toCard);
+      for (const card of liveCards) {
+        const reviews = (await tx.reviews.listByCard(card.id)).map(toReview);
+        cardWithHistory.push({ card, history: reviews });
+      }
+    });
+    return cardWithHistory;
   },
 
   async updateCard(cardId, patch) {

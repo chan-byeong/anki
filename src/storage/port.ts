@@ -100,7 +100,7 @@ export interface PortTables {
     append(row: ReviewRow): Promise<void>;
     /** ID로 찾는다. 없으면 null. 같은 평가 요청이 다시 왔는지 확인하는 데 쓴다. */
     get(id: string): Promise<ReviewRow | null>;
-    /** 카드의 학습 이력을 rated_at 오름차순으로. 스케줄러가 이 순서대로 재생한다(ADR 0004). */
+    /** 카드의 학습 이력을 rated_at 오름차순으로. 일정 계산은 스스로 정렬하므로 이 순서에 의존하지 않는다(ADR 0015). */
     listByCard(cardId: string): Promise<ReviewRow[]>;
   };
   tombstones: {
