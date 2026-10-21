@@ -115,6 +115,11 @@ export interface Store {
   getCard(cardId: string): Promise<Card | null>;
   /** 덱이 없거나 휴지통에 있으면 거부한다. 빈 덱과 구분하기 위해서다. */
   listCards(deckId: string): Promise<Card[]>;
+  /**
+   * 덱에서 평가를 한 번도 받지 않은 살아 있는 카드를 만든 순서대로. countUnreviewedCards의 목록판이다.
+   * 복습일을 계산하지 않는다. 덱이 없거나 휴지통에 있으면 거부한다.
+   */
+  listUnreviewedCards(deckId: string): Promise<Card[]>;
   updateCard(cardId: string, patch: CardPatch): Promise<Card>;
   trashCard(cardId: string): Promise<void>;
 
@@ -384,6 +389,13 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     return port.transaction(async (tx) => {
       await findAliveDeck(tx, deckId);
       return (await tx.cards.listAliveByDeck(deckId)).map(toCard);
+    });
+  },
+
+  async listUnreviewedCards(deckId) {
+    return port.transaction(async (tx) => {
+      await findAliveDeck(tx, deckId);
+      return (await tx.cards.listUnreviewedAliveByDeck(deckId)).map(toCard);
     });
   },
 

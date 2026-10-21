@@ -82,6 +82,8 @@ export interface PortTables {
     get(id: string): Promise<CardRow | null>;
     /** 덱에 속한 살아 있는 카드를 created_at 오름차순으로. */
     listAliveByDeck(deckId: string): Promise<CardRow[]>;
+    /** 덱에서 삭제 표시가 없고 학습 이력이 없는 카드를 created_at 오름차순으로. */
+    listUnreviewedAliveByDeck(deckId: string): Promise<CardRow[]>;
     /** 삭제 표시가 없고 학습 이력이 없는 카드를 덱별로 센다. 카드가 없는 덱은 빠진다. */
     countUnreviewedAliveByDeck(): Promise<{ deck_id: string; count: number }[]>;
     /** 휴지통에 있는 카드를 deleted_at 내림차순으로. 덱과 함께 삭제된 카드도 포함한다. */

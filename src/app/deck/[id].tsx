@@ -5,12 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, MoreIcon, Notice, PageHeader, PlusIcon, Sheet, TopBar } from '@/components';
 import { CardRow } from '@/features/cards/CardRow';
+import { CardSearchField } from '@/features/cards/CardSearchField';
+import { searchCards } from '@/features/cards/search-cards';
 import { useDeckCards } from '@/features/cards/use-deck-cards';
 import { useDeck } from '@/features/decks/use-deck';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
-// 덱 상세(Deck-1, Deck-4). 검색, 나머지 메뉴 동작, 카드 열기는 각각 STA-116, STA-131, STA-115에서 더한다.
+// 덱 상세(Deck-1, Deck-4). 검색과 나머지 메뉴 동작은 각각 STA-116, STA-131에서 더한다.
 export default function DeckScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, retry } = useDeck(id);
@@ -19,8 +21,11 @@ export default function DeckScreen() {
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<View>(null);
+  const [query, setQuery] = useState('');
 
   const addCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });
+  const openCard = (cardId: string) =>
+    router.push({ pathname: '/card/[id]', params: { id: cardId } });
   const startReview = () => router.push({ pathname: '/review/[deckId]', params: { deckId: id } });
   // 카드를 읽기 전에는 캡션을 비워 둔다. "카드 0장"이 잠깐 보였다 사라지지 않게 하기 위해서다.
   const caption =
@@ -70,7 +75,16 @@ export default function DeckScreen() {
       {/* 처음 읽는 동안에는 비워 둔다. 빈 상태가 잠깐 보였다 사라지지 않게 하기 위해서다. */}
       {state.kind === 'ready' && cards.kind === 'ready' ? (
         <>
-          {cards.cards.length === 0 ? <EmptyCards /> : <CardList cards={cards.cards} />}
+          {cards.cards.length === 0 ? (
+            <EmptyCards />
+          ) : (
+            <>
+              <View style={styles.search}>
+                <CardSearchField value={query} onChangeText={setQuery} />
+              </View>
+              <CardList cards={cards.cards} query={query} onOpen={openCard} />
+            </>
+          )}
           <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
             {cards.cards.length === 0 ? (
               <Button label="카드 추가" onPress={addCard} />
@@ -120,21 +134,53 @@ function EmptyCards() {
   );
 }
 
-function CardList({ cards }: { cards: { id: string; front: string; back: string }[] }) {
+interface CardListProps {
+  cards: { id: string; front: string; back: string; memo: string | null }[];
+  query: string;
+  onOpen: (cardId: string) => void;
+}
+
+function CardList({ cards, query, onOpen }: CardListProps) {
+  const { colors, text } = useTheme();
+  const searching = query.trim() !== '';
+  const shown = searchCards(cards, query);
+
   return (
-    <ScrollView style={styles.fill} contentContainerStyle={styles.list}>
-      <View accessibilityRole="list" accessibilityLabel="카드 목록">
-        {cards.map((card, index) => (
-          <CardRow
-            key={card.id}
-            front={card.front}
-            back={card.back}
-            status="신규"
-            last={index === cards.length - 1}
-          />
-        ))}
-      </View>
-    </ScrollView>
+    <>
+      {searching ? (
+        <Text
+          role="status"
+          style={[text('caption'), styles.count, { color: colors.muted }]}
+        >{`${shown.length}장`}</Text>
+      ) : null}
+      {shown.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={text('title', { weight: 'bold' })}>검색 결과가 없어요</Text>
+          <Text style={[text('body'), { color: colors.muted }]}>다른 검색어로 찾아보세요.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <View accessibilityRole="list" accessibilityLabel={searching ? '검색 결과' : '카드 목록'}>
+            {shown.map((card, index) => (
+              <CardRow
+                key={card.id}
+                front={card.front}
+                back={card.back}
+                status="신규"
+                highlight={query}
+                onPress={() => onOpen(card.id)}
+                last={index === shown.length - 1}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </>
   );
 }
 
@@ -142,6 +188,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   fill: { flex: 1 },
   notice: { padding: space[4] },
+  search: { paddingHorizontal: space[4], paddingBottom: space[2] },
+  count: { paddingHorizontal: space[4], paddingTop: space[1] },
   list: { paddingHorizontal: space[4] },
   empty: { flex: 1, justifyContent: 'center', paddingHorizontal: space[4], gap: space[2] },
   footer: { paddingTop: space[3], paddingHorizontal: space[4] },

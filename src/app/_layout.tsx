@@ -27,6 +27,7 @@ function ThemedStack() {
         <Stack.Screen name="deck/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="deck/[id]/edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="card/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="card/[id]" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );

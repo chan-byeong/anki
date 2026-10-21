@@ -72,6 +72,14 @@ const tablesOn = (db: MemoryBacking): PortTables => ({
     get: async (id) => copy(db.cards.get(id)),
     listAliveByDeck: async (deckId) =>
       select(db.cards, (row) => row.deck_id === deckId && row.deleted_at === null, byCreated),
+    listUnreviewedAliveByDeck: async (deckId) => {
+      const reviewed = new Set([...db.reviews.values()].map((review) => review.card_id));
+      return select(
+        db.cards,
+        (row) => row.deck_id === deckId && row.deleted_at === null && !reviewed.has(row.id),
+        byCreated,
+      );
+    },
     countUnreviewedAliveByDeck: async () => {
       const reviewed = new Set([...db.reviews.values()].map((review) => review.card_id));
       const counts = new Map<string, number>();
