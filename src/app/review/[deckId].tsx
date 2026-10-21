@@ -1,23 +1,31 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import * as Crypto from 'expo-crypto';
+import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CloseIcon, IconButton, Notice } from '@/components';
+import { CloseIcon, IconButton, Notice, RatingMark } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
+import type { ReviewScreenInput } from '@/features/review/review-screen-input';
 import { useReviewQueue } from '@/features/review/use-review-queue';
-import type { Card } from '@/storage/store';
+import type { Card, RateInput, Rating, Review } from '@/storage/store';
+import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, size, space } from '@/theme/tokens';
 
 const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
+const RATINGS = [
+  { kind: 'forgot', label: '모름', rating: 'dont' },
+  { kind: 'unsure', label: '헷갈림', rating: 'unsure' },
+  { kind: 'knew', label: '앎', rating: 'know' },
+] as const;
+
 // 복습(Review-1, Review-3). 대기열의 앞면을 먼저 보이고, 카드를 눌러 뒷면(정답)을 연다.
-// 평가와 다음 카드, 메모·발음 버튼, 이미지, 끝 상태는 이 화면에 더하지 않았다(STA-118 이후).
-export default function ReviewScreen() {
+export default function ReviewScreen(input: ReviewScreenInput = {}) {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const queue = useReviewQueue(deckId);
-  const { colors, text } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const empty = queue.kind === 'ready' && queue.cards.length === 0;
 
@@ -30,15 +38,19 @@ export default function ReviewScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      <View style={styles.bar}>
-        <IconButton icon={CloseIcon} label="복습 닫기" onPress={close} />
-        {queue.kind === 'ready' && !empty ? (
-          <Text style={[text('caption'), styles.remaining, { color: colors.muted }]}>
-            {`${queue.cards.length}장 남음`}
-          </Text>
-        ) : null}
-      </View>
-      {first ? <ReviewCard card={first} insetBottom={insets.bottom} /> : null}
+      {first && queue.kind === 'ready' ? (
+        <ReviewSession
+          key={deckId}
+          {...input}
+          first={first}
+          initialRemaining={queue.cards.length}
+          insetBottom={insets.bottom}
+        />
+      ) : (
+        <View style={styles.bar}>
+          <IconButton icon={CloseIcon} label="복습 닫기" onPress={close} />
+        </View>
+      )}
       {queue.kind === 'missing' || queue.kind === 'failed' ? (
         <View style={styles.notice}>
           <Notice
@@ -53,12 +65,86 @@ export default function ReviewScreen() {
   );
 }
 
-interface ReviewCardProps {
-  card: Card;
+interface ReviewSessionProps extends ReviewScreenInput {
+  first: Card;
+  initialRemaining: number;
   insetBottom: number;
 }
 
-function ReviewCard({ card, insetBottom }: ReviewCardProps) {
+function ReviewSession({
+  first,
+  initialRemaining,
+  insetBottom,
+  advanceAfterRating,
+}: ReviewSessionProps) {
+  const store = useStore();
+  const { colors, text } = useTheme();
+  const [session, setSession] = useState<{
+    card: Card | null;
+    remaining: number;
+    ratings: Rating[];
+  }>(() => ({ card: first, remaining: initialRemaining, ratings: [] }));
+  const [saving, setSaving] = useState(false);
+  const [pendingRating, setPendingRating] = useState<Rating | null>(null);
+  const busy = useRef(false);
+  const request = useRef<{ input: RateInput; review?: Review } | null>(null);
+
+  const rate = async (rating: Rating) => {
+    if (!advanceAfterRating || !session.card || busy.current) return;
+    if (request.current && request.current.input.rating !== rating) return;
+    busy.current = true;
+    setSaving(true);
+    setPendingRating(rating);
+    try {
+      request.current ??= { input: { id: Crypto.randomUUID(), rating, hintUsed: false } };
+      const attempt = request.current;
+      attempt.review ??= await store.rateCard(session.card.id, attempt.input);
+      const next = await advanceAfterRating(attempt.review);
+      const recordedRating = attempt.review.rating;
+      setSession((current) => ({ ...next, ratings: [...current.ratings, recordedRating] }));
+      request.current = null;
+      setPendingRating(null);
+    } catch {
+      // 실패한 요청은 같은 평가 ID로 다시 시도한다. 저장 뒤 전환만 실패했다면 저장을 반복하지 않는다.
+      // 실패 안내 문구는 브리프에 없어 추가하지 않는다.
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
+  };
+
+  if (!session.card) return null;
+
+  return (
+    <>
+      <View style={styles.bar}>
+        <IconButton icon={CloseIcon} label="복습 닫기" onPress={close} />
+        <Text style={[text('caption'), styles.remaining, { color: colors.muted }]}>
+          {`${session.remaining}장 남음`}
+        </Text>
+      </View>
+      <ReviewCard
+        // 같은 카드가 재등장해도 새 앞면으로 시작한다. 순서와 남은 수는 주입된 API의 결과만 쓴다.
+        key={session.ratings.length}
+        card={session.card}
+        insetBottom={insetBottom}
+        onRate={rate}
+        ratingDisabled={!advanceAfterRating || saving}
+        pendingRating={pendingRating}
+      />
+    </>
+  );
+}
+
+interface ReviewCardProps {
+  card: Card;
+  insetBottom: number;
+  onRate: (rating: Rating) => void;
+  ratingDisabled: boolean;
+  pendingRating: Rating | null;
+}
+
+function ReviewCard({ card, insetBottom, onRate, ratingDisabled, pendingRating }: ReviewCardProps) {
   const { colors, text } = useTheme();
   const deckName = useDeckName(card.deckId);
   const [revealed, setRevealed] = useState(false);
@@ -116,7 +202,29 @@ function ReviewCard({ card, insetBottom }: ReviewCardProps) {
         </Text>
       </View>
       <View style={[styles.footer, { paddingBottom: space[2] + insetBottom }]}>
-        {revealed ? null : (
+        {revealed ? (
+          <View role="group" accessibilityLabel="평가" style={styles.ratings}>
+            {RATINGS.map(({ kind, label, rating }) => {
+              const disabled =
+                ratingDisabled || (pendingRating !== null && pendingRating !== rating);
+              return (
+                <Pressable
+                  key={kind}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ disabled }}
+                  disabled={disabled}
+                  onPress={() => onRate(rating)}
+                  style={[styles.rating, { backgroundColor: colors.surface }]}
+                >
+                  <View aria-hidden>
+                    <RatingMark kind={kind} size={size.ratingMark} />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
           <Text aria-hidden style={[text('caption'), { color: colors.muted }]}>
             카드를 눌러 정답 보기
           </Text>
@@ -155,6 +263,14 @@ const styles = StyleSheet.create({
     paddingTop: space[3],
     paddingHorizontal: space[4],
     minHeight: size.rating + space[3] + space[2],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ratings: { flexDirection: 'row', gap: space[2], alignSelf: 'stretch' },
+  rating: {
+    flex: 1,
+    minHeight: size.rating,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },

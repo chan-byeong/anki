@@ -101,6 +101,8 @@ export const size = {
   button: 56,
   row: 64,
   rating: 72,
+  // 브리프의 평가 버튼 마크. 캔버스 토큰 누락(STA-141 점검 대상).
+  ratingMark: 28,
   thumb: 96,
   // 아이콘 버튼을 화면 여백 24에 시각적으로 맞추는 바깥 여백 (space-4 / 2)
   edgeIcon: space[4] / 2,
