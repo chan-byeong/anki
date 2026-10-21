@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CloseIcon, IconButton, Notice, RatingMark } from '@/components';
+import { Button, CheckIcon, CloseIcon, IconButton, Notice, RatingMark } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import type { ReviewScreenInput } from '@/features/review/review-screen-input';
 import { useReviewQueue } from '@/features/review/use-review-queue';
@@ -76,6 +76,7 @@ function ReviewSession({
   initialRemaining,
   insetBottom,
   advanceAfterRating,
+  tomorrowCount,
 }: ReviewSessionProps) {
   const store = useStore();
   const { colors, text } = useTheme();
@@ -113,7 +114,15 @@ function ReviewSession({
     }
   };
 
-  if (!session.card) return null;
+  if (!session.card) {
+    return (
+      <ReviewDone
+        ratings={session.ratings}
+        tomorrowCount={tomorrowCount}
+        insetBottom={insetBottom}
+      />
+    );
+  }
 
   return (
     <>
@@ -132,6 +141,63 @@ function ReviewSession({
         ratingDisabled={!advanceAfterRating || saving}
         pendingRating={pendingRating}
       />
+    </>
+  );
+}
+
+interface ReviewDoneProps {
+  ratings: Rating[];
+  tomorrowCount?: number;
+  insetBottom: number;
+}
+
+function ReviewDone({ ratings, tomorrowCount, insetBottom }: ReviewDoneProps) {
+  const { colors, text } = useTheme();
+
+  return (
+    <>
+      <View style={styles.doneMain}>
+        <CheckIcon size={space[5]} color={colors.success} />
+        <View style={styles.doneTitle}>
+          <Text
+            accessibilityRole="header"
+            style={[text('title', { weight: 'bold' }), styles.center]}
+          >
+            오늘 복습 끝
+          </Text>
+          <Text style={[text('body'), styles.center, { color: colors.muted }]}>
+            {`${ratings.length}장을 봤어요`}
+          </Text>
+        </View>
+        <View role="list" accessibilityLabel="평가 결과" style={styles.results}>
+          {RATINGS.map(({ kind, label, rating }) => {
+            const count = ratings.filter((value) => value === rating).length;
+            return (
+              <View
+                key={kind}
+                accessible
+                role="listitem"
+                accessibilityLabel={`${label} ${count}`}
+                style={styles.result}
+              >
+                <View aria-hidden>
+                  <RatingMark kind={kind} />
+                </View>
+                <Text style={[text('body', { weight: 'bold' }), styles.resultCount]}>{count}</Text>
+              </View>
+            );
+          })}
+        </View>
+        {/* 0장·미주입 시 문구는 미정이다. 실제 연결 전에 확정하며 임의 문구나 숫자는 넣지 않는다. */}
+        {tomorrowCount !== undefined && tomorrowCount > 0 ? (
+          <Text style={[text('caption'), styles.center, { color: colors.muted }]}>
+            {`다음 복습일 · 내일 ${tomorrowCount}장`}
+          </Text>
+        ) : null}
+      </View>
+      <View style={[styles.doneFooter, { paddingBottom: space[2] + insetBottom }]}>
+        <Button label="덱 목록으로" onPress={() => router.replace('/')} />
+      </View>
     </>
   );
 }
@@ -274,4 +340,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  doneMain: {
+    flex: 1,
+    paddingHorizontal: space[4],
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[4],
+  },
+  doneTitle: { alignItems: 'center', gap: space[2] },
+  results: { flexDirection: 'row', gap: space[4] },
+  result: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  resultCount: { fontVariant: ['tabular-nums'] },
+  doneFooter: { paddingHorizontal: space[4], paddingTop: space[3] },
 });

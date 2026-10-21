@@ -5,8 +5,9 @@ import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import HomeScreen from '@/app/index';
 import ReviewScreen from '@/app/review/[deckId]';
+import type { ReviewScreenInput } from '@/features/review/review-screen-input';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
-import { createStore, type Card, type Rating, type Review, type Store } from '@/storage/store';
+import { createStore, type Rating, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -35,15 +36,10 @@ function DeckRoute() {
   return <Text>{`/deck/${id}`}</Text>;
 }
 
-type ReviewInput = {
-  advanceAfterRating?: (review: Review) => Promise<{ card: Card | null; remaining: number }>;
-  tomorrowCount?: number;
-};
-
 const renderApp = async (
   store: Store,
   initialUrl: string,
-  input: ReviewInput = {},
+  input: ReviewScreenInput = {},
   theme?: ThemeName,
 ) => {
   const ReviewRoute = () => <ReviewScreen {...input} />;
@@ -179,6 +175,57 @@ describe('복습 화면: 평가', () => {
   });
 });
 
+describe('복습 화면: 복습 끝', () => {
+  test.each<ThemeName>(['light', 'dark'])(
+    '%s: 마지막 평가 후 이번에 본 카드 수·평가 결과·주입된 내일 카드 수를 보여 주고 홈으로 간다',
+    async (theme) => {
+      const { store, deck } = await seed();
+      const [apple, pear] = await store.listCards(deck.id);
+      const past = await store.createCard(deck.id, { front: '이미 본 카드', back: '과거 정답' });
+      await store.rateCard(past.id, { id: 'past-review', rating: 'know', hintUsed: false });
+      // 재등장 순서나 종료 조건은 계산하지 않고 core의 응답만 대체한다.
+      const advanceAfterRating = jest
+        .fn()
+        .mockResolvedValueOnce({ card: pear, remaining: 3 })
+        .mockResolvedValueOnce({ card: apple, remaining: 2 })
+        .mockResolvedValueOnce({ card: pear, remaining: 1 })
+        .mockResolvedValueOnce({ card: null, remaining: 0 });
+      await renderApp(
+        store,
+        `/review/${deck.id}`,
+        { advanceAfterRating, tomorrowCount: 42 },
+        theme,
+      );
+      const user = setupUser();
+
+      for (const name of ['모름', '헷갈림', '앎', '앎']) {
+        expect(screen.queryByRole('header', { name: '오늘 복습 끝' })).toBeNull();
+        await user.press(screen.getByRole('button', { name: '정답 확인' }));
+        await user.press(screen.getByRole('button', { name }));
+      }
+
+      expect(await screen.findByRole('header', { name: '오늘 복습 끝' })).toBeOnTheScreen();
+      expect(screen.getByText('4장을 봤어요')).toBeOnTheScreen();
+      const results = screen.getByLabelText('평가 결과');
+      expect(
+        within(results)
+          .getAllByRole('listitem')
+          .map((item) => item.props.accessibilityLabel),
+      ).toEqual(['모름 1', '헷갈림 1', '앎 2']);
+      expect(within(results).queryAllByRole('image')).toHaveLength(0);
+      expect(screen.getByText('다음 복습일 · 내일 42장')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: '복습 닫기' })).toBeNull();
+      expect(screen.queryByLabelText('평가')).toBeNull();
+      expect(screen.queryByText(/장 남음/)).toBeNull();
+      expect(screen.queryByText(`/deck/${deck.id}`)).toBeNull();
+
+      await user.press(screen.getByRole('button', { name: '덱 목록으로' }));
+
+      expect(await screen.findByRole('header', { name: '덱' })).toBeOnTheScreen();
+    },
+  );
+});
+
 describe('복습 화면: 앞면과 정답 확인', () => {
   test('홈에서 덱을 누르면 복습이 시작되고 가장 먼저 만든 카드의 앞면이 보인다', async () => {
     const { store } = await seed();
@@ -253,6 +300,7 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     await renderApp(store, `/review/${deck.id}`);
 
     expect(await screen.findByText(`/deck/${deck.id}`)).toBeOnTheScreen();
+    expect(screen.queryByRole('header', { name: '오늘 복습 끝' })).toBeNull();
     expect(screen.queryByText('카드를 눌러 정답 보기', { includeHiddenElements: true })).toBeNull();
   });
 
