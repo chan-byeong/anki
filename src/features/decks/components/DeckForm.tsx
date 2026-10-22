@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CheckIcon, Field, Notice, TopBar } from '@/components';
 import { StoreError, type Deck } from '@/storage/store';
-import { saveFailureBody } from '@/features/storage-status/storage-status';
+import { saveFailureMessage } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
@@ -113,7 +113,7 @@ export function DeckForm({ deck }: { deck?: Deck }) {
       if (error instanceof StoreError && (error.code === 'not_found' || error.code === 'trashed')) {
         setMissing(true);
       } else {
-        setFailure(saveFailureBody(error));
+        setFailure(saveFailureMessage(error));
       }
       submitting.current = false;
       setSaving(false);

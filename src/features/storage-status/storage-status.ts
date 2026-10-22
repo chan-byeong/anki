@@ -10,7 +10,7 @@ export const isStorageFullError = (error: unknown): boolean =>
   error instanceof Error && /disk is full|SQLITE_FULL/i.test(error.message);
 
 // 저장 실패 안내의 본문. 입력한 내용은 화면에 그대로 남아 있으므로 다음 행동만 알린다.
-export const saveFailureBody = (error: unknown): string =>
+export const saveFailureMessage = (error: unknown): string =>
   isStorageFullError(error)
     ? '기기 저장 공간이 부족해요. 입력한 내용은 그대로 있어요. 공간을 정리한 뒤 다시 저장해 주세요.'
     : '입력한 내용은 그대로예요. 잠시 뒤 다시 해 주세요.';

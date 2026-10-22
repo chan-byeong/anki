@@ -2,7 +2,7 @@ import {
   isLowSpace,
   isStorageFullError,
   LOW_SPACE_BYTES,
-  saveFailureBody,
+  saveFailureMessage,
 } from '../storage-status';
 
 describe('isLowSpace', () => {
@@ -33,16 +33,16 @@ describe('isStorageFullError', () => {
   });
 });
 
-describe('saveFailureBody', () => {
+describe('saveFailureMessage', () => {
   test('저장 공간 부족이면 원인과 다음 행동을 알린다', () => {
-    const body = saveFailureBody(new Error('database or disk is full'));
+    const body = saveFailureMessage(new Error('database or disk is full'));
 
     expect(body).toContain('저장 공간');
     expect(body).toContain('정리');
   });
 
   test('그 밖의 오류는 잠시 뒤 다시 하라고 알린다', () => {
-    expect(saveFailureBody(new Error('boom'))).toBe(
+    expect(saveFailureMessage(new Error('boom'))).toBe(
       '입력한 내용은 그대로예요. 잠시 뒤 다시 해 주세요.',
     );
   });

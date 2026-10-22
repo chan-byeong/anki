@@ -7,7 +7,7 @@ import { Button, Field, Notice, TopBar } from '@/components';
 import { useCard } from '@/features/cards/use-card';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import type { Card } from '@/storage/store';
-import { saveFailureBody } from '@/features/storage-status/storage-status';
+import { saveFailureMessage } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
@@ -77,7 +77,7 @@ function EditForm({ card }: EditFormProps) {
       });
       close();
     } catch (error) {
-      setFailure(saveFailureBody(error));
+      setFailure(saveFailureMessage(error));
       setSaving(false);
     }
   };
