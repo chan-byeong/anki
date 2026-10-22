@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -36,6 +36,17 @@ export default function HomeScreen() {
           .filter(({ deck, todayCount }) => chosen.includes(deck.id) && todayCount > 0)
           .map(({ deck }) => deck.id)
       : chosen;
+
+  // 안드로이드 뒤로가기는 앱을 나가지 않고 선택 모드만 닫는다.
+  const selecting = chosen !== null;
+  useEffect(() => {
+    if (!selecting) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelected(null);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [selecting]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
