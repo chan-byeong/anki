@@ -2,9 +2,18 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, IconButton, Notice, PlusIcon, SettingsIcon, StatsIcon } from '@/components';
+import {
+  Button,
+  IconButton,
+  InboxIcon,
+  Notice,
+  PlusIcon,
+  SettingsIcon,
+  StatsIcon,
+} from '@/components';
 import { DeckRow } from '@/features/decks/components/DeckRow';
 import { useDeckList, type DeckListItem } from '@/features/decks/use-deck-list';
+import { useLowSpace } from '@/features/storage-status/use-low-space';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
 
@@ -14,6 +23,7 @@ export default function HomeScreen() {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
   const state = useDeckList();
+  const lowSpace = useLowSpace();
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
@@ -27,6 +37,16 @@ export default function HomeScreen() {
           <IconButton icon={SettingsIcon} label="설정" onPress={() => router.push('/settings')} />
         </View>
       </View>
+      {lowSpace ? (
+        <View style={styles.lowSpace}>
+          <Notice
+            tone="danger"
+            icon={InboxIcon}
+            title="저장 공간이 거의 찼어요"
+            body="새 카드와 이미지를 저장하지 못할 수 있어요. 기기 공간을 정리해 주세요."
+          />
+        </View>
+      ) : null}
       {/* 처음 읽는 동안에는 비워 둔다. 빈 상태가 잠깐 보였다 사라지지 않게 하기 위해서다. */}
       {state.kind === 'failed' ? (
         <View style={styles.notice}>
@@ -104,6 +124,7 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: 'row' },
   notice: { padding: space[4] },
+  lowSpace: { paddingTop: space[2], paddingHorizontal: space[4] },
   list: { paddingTop: space[3], paddingHorizontal: space[4] },
   empty: { flex: 1, justifyContent: 'center', paddingHorizontal: space[4], gap: space[2] },
   footer: { paddingTop: space[3], paddingHorizontal: space[4] },

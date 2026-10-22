@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Field, Notice, TopBar } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
+import { saveFailureBody } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
@@ -22,7 +23,7 @@ export default function NewCardScreen() {
   const [memo, setMemo] = useState('');
   const [added, setAdded] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   // 저장할 때마다 바꿔서 입력창을 새로 만든다. multiline 입력창은 값을 비워도 긴 글로 커진 높이가 남는다.
   const [formKey, setFormKey] = useState(0);
   const canSave = front.trim() !== '' && back.trim() !== '' && !saving;
@@ -30,7 +31,7 @@ export default function NewCardScreen() {
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    setFailed(false);
+    setFailure(null);
     try {
       const card = await store.createCard(deckId, {
         front: front.trim(),
@@ -42,8 +43,8 @@ export default function NewCardScreen() {
       setBack('');
       setMemo('');
       setFormKey((key) => key + 1);
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      setFailure(saveFailureBody(error));
     } finally {
       setSaving(false);
     }
@@ -108,9 +109,7 @@ export default function NewCardScreen() {
           value={memo}
           onChangeText={setMemo}
         />
-        {failed ? (
-          <Notice tone="danger" title="카드를 저장하지 못했어요" body="잠시 뒤 다시 해 주세요." />
-        ) : null}
+        {failure ? <Notice tone="danger" title="카드를 저장하지 못했어요" body={failure} /> : null}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
         <Button label="저장" onPress={save} disabled={!canSave} />

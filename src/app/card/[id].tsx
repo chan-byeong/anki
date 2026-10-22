@@ -7,6 +7,7 @@ import { Button, Field, Notice, TopBar } from '@/components';
 import { useCard } from '@/features/cards/use-card';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import type { Card } from '@/storage/store';
+import { saveFailureBody } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
@@ -59,14 +60,14 @@ function EditForm({ card }: EditFormProps) {
   const [back, setBack] = useState(card.back);
   const [memo, setMemo] = useState(card.memo ?? '');
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const missing = front.trim() === '' || back.trim() === '';
   const canSave = !missing && !saving;
 
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    setFailed(false);
+    setFailure(null);
     try {
       // 값이 그대로인 필드는 Store가 건너뛰므로 고친 필드의 수정 시각만 바뀐다.
       await store.updateCard(card.id, {
@@ -75,8 +76,8 @@ function EditForm({ card }: EditFormProps) {
         memo: memo.trim() === '' ? null : memo.trim(),
       });
       close();
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      setFailure(saveFailureBody(error));
       setSaving(false);
     }
   };
@@ -102,9 +103,7 @@ function EditForm({ card }: EditFormProps) {
         <Field label="앞면" size="title" first multiline value={front} onChangeText={setFront} />
         <Field label="뒷면" multiline value={back} onChangeText={setBack} />
         <Field label="메모" optional multiline value={memo} onChangeText={setMemo} />
-        {failed ? (
-          <Notice tone="danger" title="카드를 저장하지 못했어요" body="잠시 뒤 다시 해 주세요." />
-        ) : null}
+        {failure ? <Notice tone="danger" title="카드를 저장하지 못했어요" body={failure} /> : null}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
         <Button label="저장" onPress={save} disabled={!canSave} />

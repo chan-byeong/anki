@@ -7,14 +7,13 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
 
+import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
 import { openAppStore } from '@/storage/open-app-store';
 import type { Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
-import { space } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,19 +32,6 @@ function ThemedStack() {
   );
 }
 
-// 저장소를 열지 못했을 때의 최소 안내. 디자인된 오류 화면(State-6)은 따로 만든다.
-function StoreFailed() {
-  const { colors, text } = useTheme();
-  return (
-    <View style={[styles.failed, { backgroundColor: colors.bg }]}>
-      <Text accessibilityRole="header" style={text('title', { weight: 'bold' })}>
-        저장소를 열지 못했어요
-      </Text>
-      <Text style={[text('body'), { color: colors.muted }]}>앱을 다시 열어 주세요.</Text>
-    </View>
-  );
-}
-
 type StoreState = { kind: 'opening' } | { kind: 'open'; store: Store } | { kind: 'failed' };
 
 export default function RootLayout() {
@@ -58,12 +44,25 @@ export default function RootLayout() {
   const [storeState, setStoreState] = useState<StoreState>({ kind: 'opening' });
   const ready = (fontsLoaded || fontError !== null) && storeState.kind !== 'opening';
 
+  const [retrying, setRetrying] = useState(false);
+
+  const openStore = useCallback(
+    () =>
+      openAppStore().then(
+        (store) => setStoreState({ kind: 'open', store }),
+        () => setStoreState({ kind: 'failed' }),
+      ),
+    [],
+  );
+
   useEffect(() => {
-    openAppStore().then(
-      (store) => setStoreState({ kind: 'open', store }),
-      () => setStoreState({ kind: 'failed' }),
-    );
-  }, []);
+    openStore();
+  }, [openStore]);
+
+  const retry = () => {
+    setRetrying(true);
+    openStore().finally(() => setRetrying(false));
+  };
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -78,12 +77,8 @@ export default function RootLayout() {
           <ThemedStack />
         </StoreProvider>
       ) : (
-        <StoreFailed />
+        <StorageErrorScreen onRetry={retry} retrying={retrying} />
       )}
     </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  failed: { flex: 1, justifyContent: 'center', padding: space[4], gap: space[2] },
-});
