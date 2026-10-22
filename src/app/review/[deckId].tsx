@@ -6,13 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Notice } from '@/components';
 import { ReviewBar } from '@/features/review/components/ReviewBar';
 import { ReviewFlow } from '@/features/review/components/ReviewFlow';
-import type { ReviewScreenInput } from '@/features/review/review-screen-input';
 import { useReviewQueue } from '@/features/review/use-review-queue';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
 // 복습(Review-1, Review-3). 대기열의 앞면을 먼저 보이고, 카드를 눌러 뒷면(정답)을 연다.
-export default function ReviewScreen(input: ReviewScreenInput = {}) {
+export default function ReviewScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const queue = useReviewQueue(deckId);
   const { colors } = useTheme();
@@ -27,7 +26,12 @@ export default function ReviewScreen(input: ReviewScreenInput = {}) {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       {queue.kind === 'ready' && !empty ? (
-        <ReviewFlow key={deckId} {...input} cards={queue.cards} insetBottom={insets.bottom} />
+        <ReviewFlow
+          key={deckId}
+          deckId={deckId}
+          cards={queue.cards}
+          insetBottom={insets.bottom}
+        />
       ) : (
         <ReviewBar />
       )}

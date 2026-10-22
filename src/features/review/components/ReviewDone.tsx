@@ -51,7 +51,7 @@ export function ReviewDone({ ratings, tomorrowCount, insetBottom }: ReviewDonePr
             );
           })}
         </View>
-        {/* 0장·미주입 시 문구는 미정이다. 실제 연결 전에 확정하며 임의 문구나 숫자는 넣지 않는다. */}
+        {/* 캔버스에 0장일 때 문구가 없어 줄을 숨긴다. 아직 세지 못했을 때도 숨긴다. */}
         {tomorrowCount !== undefined && tomorrowCount > 0 ? (
           <Text style={[text('caption'), styles.center, { color: colors.muted }]}>
             {`다음 복습일 · 내일 ${tomorrowCount}장`}

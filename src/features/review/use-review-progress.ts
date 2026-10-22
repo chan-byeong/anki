@@ -2,7 +2,6 @@ import * as Crypto from 'expo-crypto';
 import { useRef, useState } from 'react';
 
 import { createNextCardAfterRating } from '@/features/review/next-card-after-rating';
-import type { NextCardAfterRating } from '@/features/review/review-screen-input';
 import type { Card, RateInput, Rating, Review } from '@/storage/store';
 import { useStore } from '@/storage/StoreProvider';
 
@@ -20,14 +19,10 @@ interface UseReviewProgress {
 }
 
 // 한 번의 복습 진행 상태. 평가를 저장하고 다음 카드로 넘어가며, 지금까지의 평가를 모은다.
-export function useReviewProgress(
-  cards: Card[],
-  injected: NextCardAfterRating | undefined,
-): UseReviewProgress {
+export function useReviewProgress(cards: Card[]): UseReviewProgress {
   const store = useStore();
-  // 주입이 없으면 복습을 시작할 때 읽은 대기열로 실제 전환을 만든다. 순서 상태는 이 복습 안에만 있다(ADR 0016).
-  const [defaultNextCardAfterRating] = useState(() => createNextCardAfterRating(store, cards));
-  const nextCardAfterRating = injected ?? defaultNextCardAfterRating;
+  // 복습을 시작할 때 읽은 대기열로 전환을 만든다. 순서 상태는 이 복습 안에만 있다(ADR 0016).
+  const [nextCardAfterRating] = useState(() => createNextCardAfterRating(store, cards));
   const [progress, setProgress] = useState<ReviewProgress>(() => ({
     card: cards[0] ?? null,
     remaining: cards.length,

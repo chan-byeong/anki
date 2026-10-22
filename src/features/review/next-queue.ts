@@ -1,6 +1,6 @@
 import type { Card } from '@/storage/store';
 
-export type NextQueueInfo = {
+type NextQueueInfo = {
   queue: Card[];
   card: Card | null;
   remaining: number;

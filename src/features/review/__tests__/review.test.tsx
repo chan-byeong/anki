@@ -1,11 +1,10 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { AccessibilityInfo, Text } from 'react-native';
 import { userEvent, within } from '@testing-library/react-native';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
+import { AccessibilityInfo, Text } from 'react-native';
 
 import HomeScreen from '@/app/index';
 import ReviewScreen from '@/app/review/[deckId]';
-import type { ReviewScreenInput } from '@/features/review/review-screen-input';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore, type Rating, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
@@ -36,13 +35,7 @@ function DeckRoute() {
   return <Text>{`/deck/${id}`}</Text>;
 }
 
-const renderApp = async (
-  store: Store,
-  initialUrl: string,
-  input: ReviewScreenInput = {},
-  theme?: ThemeName,
-) => {
-  const ReviewRoute = () => <ReviewScreen {...input} />;
+const renderApp = async (store: Store, initialUrl: string, theme?: ThemeName) => {
   const Layout = () => (
     <ThemeProvider override={theme}>
       <StoreProvider store={store}>
@@ -55,7 +48,7 @@ const renderApp = async (
       _layout: Layout,
       index: HomeScreen,
       'deck/[id]': DeckRoute,
-      'review/[deckId]': ReviewRoute,
+      'review/[deckId]': ReviewScreen,
     },
     { initialUrl },
   );
@@ -80,8 +73,7 @@ describe('복습 화면: 평가', () => {
     '%s: 정답을 연 뒤에만 모름·헷갈림·앎 버튼이 순서대로 나타나고 마크는 장식이다',
     async (theme) => {
       const { store, deck } = await seed();
-      const nextCardAfterRating = jest.fn().mockResolvedValue({ card: null, remaining: 0 });
-      await renderApp(store, `/review/${deck.id}`, { nextCardAfterRating }, theme);
+      await renderApp(store, `/review/${deck.id}`, theme);
       const user = setupUser();
 
       for (const name of ['모름', '헷갈림', '앎']) {
@@ -105,19 +97,18 @@ describe('복습 화면: 평가', () => {
     },
   );
 
-  test.each<{ name: string; rating: Rating }>([
-    { name: '모름', rating: 'dont' },
-    { name: '헷갈림', rating: 'unsure' },
-    { name: '앎', rating: 'know' },
+  // 다음 카드와 남은 수는 대기열이 정한다(ADR 0003). 모름·헷갈림은 오늘 다시 나오므로 남은 수가 줄지 않는다.
+  test.each<{ name: string; rating: Rating; remaining: number }>([
+    { name: '모름', rating: 'dont', remaining: 2 },
+    { name: '헷갈림', rating: 'unsure', remaining: 2 },
+    { name: '앎', rating: 'know', remaining: 1 },
   ])(
-    '$name 버튼은 $rating 평가를 저장하고 주입된 다음 카드의 앞면을 보인다',
-    async ({ name, rating }) => {
+    '$name 버튼은 $rating 평가를 저장하고 다음 카드의 앞면과 남은 수를 보인다',
+    async ({ name, rating, remaining }) => {
       const { store, deck } = await seed();
-      const [apple, pear] = await store.listCards(deck.id);
+      const [apple] = await store.listCards(deck.id);
       const save = jest.spyOn(store, 'rateCard');
-      // 다음 카드와 남은 수는 core가 결정한다. 화면이 배열 인덱스나 길이로 계산하면 안 된다.
-      const nextCardAfterRating = jest.fn().mockResolvedValue({ card: pear, remaining: 7 });
-      await renderApp(store, `/review/${deck.id}`, { nextCardAfterRating });
+      await renderApp(store, `/review/${deck.id}`);
       const user = setupUser();
 
       await user.press(screen.getByRole('button', { name: '정답 확인' }));
@@ -131,10 +122,8 @@ describe('복습 화면: 평가', () => {
         rating,
         hintUsed: false,
       });
-      const [review] = await store.listReviewHistory(apple.id);
-      expect(nextCardAfterRating).toHaveBeenCalledWith(review);
       expect(await screen.findByText('pear')).toBeOnTheScreen();
-      expect(screen.getByText('7장 남음')).toBeOnTheScreen();
+      expect(screen.getByText(`${remaining}장 남음`)).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: '정답 확인' })).toBeOnTheScreen();
       expect(screen.queryByText('배')).toBeNull();
       expect(screen.queryByLabelText('평가')).toBeNull();
@@ -142,11 +131,11 @@ describe('복습 화면: 평가', () => {
     },
   );
 
-  test('같은 카드가 다음 카드로 주입되어도 정답은 다시 닫혀 있다', async () => {
-    const { store, deck } = await seed();
-    const [apple] = await store.listCards(deck.id);
-    const nextCardAfterRating = jest.fn().mockResolvedValue({ card: apple, remaining: 1 });
-    await renderApp(store, `/review/${deck.id}`, { nextCardAfterRating });
+  test('한 장뿐인 덱에서 모름이면 같은 카드가 다시 나오고 정답은 다시 닫혀 있다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(deck.id, { front: 'apple', back: '사과' });
+    await renderApp(store, `/review/${deck.id}`);
     const user = setupUser();
 
     await user.press(screen.getByRole('button', { name: '정답 확인' }));
@@ -157,24 +146,7 @@ describe('복습 화면: 평가', () => {
     expect(screen.queryByText('사과')).toBeNull();
   });
 
-  test('전환이 주입되지 않으면 실제 전환으로 평가를 저장하고 다음 카드와 남은 수를 보인다', async () => {
-    const { store, deck } = await seed();
-    const [apple] = await store.listCards(deck.id);
-    const save = jest.spyOn(store, 'rateCard');
-    await renderApp(store, `/review/${deck.id}`);
-    const user = setupUser();
-
-    await user.press(screen.getByRole('button', { name: '정답 확인' }));
-    await user.press(screen.getByRole('button', { name: '앎' }));
-
-    expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith(apple.id, expect.objectContaining({ rating: 'know' }));
-    expect(await screen.findByText('pear')).toBeOnTheScreen();
-    expect(screen.getByText('1장 남음')).toBeOnTheScreen();
-    save.mockRestore();
-  });
-
-  test('전환이 주입되지 않아도 모름 카드는 대기열 맨 뒤에서 다시 나오고, 다 끝나면 복습 끝을 보인다', async () => {
+  test('모름 카드는 대기열 맨 뒤에서 다시 나오고, 다 끝나면 복습 끝을 보인다', async () => {
     const { store, deck } = await seed();
     await renderApp(store, `/review/${deck.id}`);
     const user = setupUser();
@@ -196,25 +168,12 @@ describe('복습 화면: 평가', () => {
 
 describe('복습 화면: 복습 끝', () => {
   test.each<ThemeName>(['light', 'dark'])(
-    '%s: 마지막 평가 후 이번에 본 카드 수·평가 결과·주입된 내일 카드 수를 보여 주고 홈으로 간다',
+    '%s: 마지막 평가 후 이번에 본 카드 수·평가 결과를 보여 주고 홈으로 간다',
     async (theme) => {
       const { store, deck } = await seed();
-      const [apple, pear] = await store.listCards(deck.id);
       const past = await store.createCard(deck.id, { front: '이미 본 카드', back: '과거 정답' });
       await store.rateCard(past.id, { id: 'past-review', rating: 'know', hintUsed: false });
-      // 재등장 순서나 종료 조건은 계산하지 않고 core의 응답만 대체한다.
-      const nextCardAfterRating = jest
-        .fn()
-        .mockResolvedValueOnce({ card: pear, remaining: 3 })
-        .mockResolvedValueOnce({ card: apple, remaining: 2 })
-        .mockResolvedValueOnce({ card: pear, remaining: 1 })
-        .mockResolvedValueOnce({ card: null, remaining: 0 });
-      await renderApp(
-        store,
-        `/review/${deck.id}`,
-        { nextCardAfterRating, tomorrowCount: 42 },
-        theme,
-      );
+      await renderApp(store, `/review/${deck.id}`, theme);
       const user = setupUser();
 
       for (const name of ['모름', '헷갈림', '앎', '앎']) {
@@ -232,7 +191,6 @@ describe('복습 화면: 복습 끝', () => {
           .map((item) => item.props.accessibilityLabel),
       ).toEqual(['모름 1', '헷갈림 1', '앎 2']);
       expect(within(results).queryAllByRole('image')).toHaveLength(0);
-      expect(screen.getByText('다음 복습일 · 내일 42장')).toBeOnTheScreen();
       expect(screen.queryByRole('button', { name: '복습 닫기' })).toBeNull();
       expect(screen.queryByLabelText('평가')).toBeNull();
       expect(screen.queryByText(/장 남음/)).toBeNull();
@@ -381,5 +339,37 @@ describe('복습 화면: 앞면과 정답 확인', () => {
 
     expect(await screen.findByRole('header', { name: '덱' })).toBeOnTheScreen();
     expect(screen.queryByText('2장 남음')).toBeNull();
+  });
+});
+
+describe('복습 화면: 내일 카드 수', () => {
+  test('오늘 평가를 반영해 복습일이 내일인 카드 수를 보인다', async () => {
+    const { store, deck } = await seed();
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+
+    // 두 카드를 모름으로 세 번씩 평가하면 오늘 대기열에서 빠지고 복습일은 내일이 된다.
+    for (let i = 0; i < 6; i += 1) {
+      await user.press(await screen.findByRole('button', { name: '정답 확인' }));
+      await user.press(screen.getByRole('button', { name: '모름' }));
+    }
+
+    expect(await screen.findByRole('header', { name: '오늘 복습 끝' })).toBeOnTheScreen();
+    expect(await screen.findByText('다음 복습일 · 내일 2장')).toBeOnTheScreen();
+  });
+
+  test('복습일이 내일인 카드가 없으면 다음 복습일 줄을 보이지 않는다', async () => {
+    const { store, deck } = await seed();
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+
+    for (let i = 0; i < 2; i += 1) {
+      await user.press(await screen.findByRole('button', { name: '정답 확인' }));
+      await user.press(screen.getByRole('button', { name: '앎' }));
+    }
+
+    expect(await screen.findByRole('header', { name: '오늘 복습 끝' })).toBeOnTheScreen();
+    await act(async () => {});
+    expect(screen.queryByText(/다음 복습일/)).toBeNull();
   });
 });
