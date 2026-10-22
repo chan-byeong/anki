@@ -31,6 +31,9 @@ export function ReviewCard({
   const [memoOpen, setMemoOpen] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
   const memoShown = card.memo !== null && memoOpen;
+  // 캔버스(Review-1): 메모를 닫고 정답을 열기 전에는 아이콘 줄이 카드 위에 떠 있어 앞면이 카드 전체의 가운데에 온다.
+  // 메모를 열거나 정답을 열면 흐름 안에 놓인다(Review-2, Review-3).
+  const memoFloats = !revealed && !memoShown;
   const frontId = `review-front-${card.id}`;
 
   const reveal = () => {
@@ -92,7 +95,10 @@ export function ReviewCard({
             </ScrollView>
           </Pressable>
           {card.memo !== null ? (
-            <View style={styles.memoArea}>
+            <View
+              style={[styles.memoArea, memoFloats ? styles.memoFloating : null]}
+              pointerEvents="box-none"
+            >
               {memoShown ? (
                 <View
                   role="region"
@@ -148,6 +154,7 @@ const styles = StyleSheet.create({
   memoArea: { paddingHorizontal: space[2], paddingBottom: space[2], gap: space[2] },
   memo: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
   // 캔버스는 손 설정(hand)에 따라 한쪽 모서리에 둔다. 설정이 생기기 전까지 오른쪽이다.
+  memoFloating: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   memoButton: { alignSelf: 'flex-end', marginRight: space[4] },
   // 캔버스의 덱 이름 자리(왼쪽 위). 긴 글이 스크롤돼도 가리지 않도록 본문 위쪽에 여백을 둔다.
   deck: { position: 'absolute', top: space[3], left: space[4] },

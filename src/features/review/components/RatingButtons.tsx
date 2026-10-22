@@ -38,7 +38,11 @@ export function RatingButtons({
             accessibilityState={{ disabled }}
             disabled={disabled}
             onPress={() => onRate(rating)}
-            style={[styles.rating, { backgroundColor: colors.surface }]}
+            // 캔버스의 비활성(opacity 0.4)과 같게, 메모 때문에 못 고르는 평가만 흐리게 한다.
+            style={[
+              styles.rating,
+              { backgroundColor: colors.surface, opacity: blockedByHint ? 0.4 : 1 },
+            ]}
           >
             <View aria-hidden>
               <RatingMark kind={kind} size={size.ratingMark} />
