@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, IconButton, Notice, PlusIcon, SettingsIcon, StatsIcon } from '@/components';
-import { DeckRow } from '@/features/decks/DeckRow';
+import { DeckRow } from '@/features/decks/components/DeckRow';
 import { useDeckList, type DeckListItem } from '@/features/decks/use-deck-list';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';

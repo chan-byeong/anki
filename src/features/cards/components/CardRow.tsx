@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
 
-import { splitMatches } from './search-cards';
+import { splitMatches } from '@/features/cards/search-cards';
 
 // 덱 상세의 카드 한 줄. 캔버스에서 공통 컴포넌트로 묶지 않은 "카드 행"이라 화면 전용 조각으로 둔다.
 // 긴 앞면·뒷면이 잘리지 않도록 줄 수를 제한하지 않는다(ListRow는 한 줄로 자른다).
