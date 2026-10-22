@@ -28,7 +28,14 @@ export default function HomeScreen() {
   const state = useDeckList();
   const lowSpace = useLowSpace();
   // 여러 덱 선택 모드. null이면 선택 모드가 아니고, 아니면 선택한 덱 ID들이다.
-  const [selected, setSelected] = useState<string[] | null>(null);
+  const [chosen, setSelected] = useState<string[] | null>(null);
+  // 선택 중에 덱이 지워지거나 오늘 복습이 끝나면 선택에서 뺀다. 개수와 합계가 어긋나지 않게 한다.
+  const selected =
+    chosen !== null && state.kind === 'ready'
+      ? state.items
+          .filter(({ deck, todayCount }) => chosen.includes(deck.id) && todayCount > 0)
+          .map(({ deck }) => deck.id)
+      : chosen;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
