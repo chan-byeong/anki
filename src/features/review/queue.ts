@@ -1,5 +1,6 @@
 import type { Card, Store } from '@/storage/store';
 import { isInQueue } from './is-in-queue';
+import { scheduleCard } from './schedule-card';
 /**
  * 덱의 오늘 대기열 카드를 만든 순서대로. Store.listCardsWithHistory로 읽고 isInQueue로 거른다.
  * 덱이 없거나 휴지통에 있으면 Store가 던진 오류를 그대로 던진다. today는 학습일이다.
@@ -24,4 +25,18 @@ export const countQueue: (store: Store, today: number) => Promise<Record<string,
     counts[deck.id] = (await listQueue(store, deck.id, today)).length;
   }
   return counts;
+};
+
+/**
+ * 덱에서 복습일이 정확히 studyDay인 카드 수(복습 끝 화면의 "내일 N장"). 신규 카드와 밀린 카드는 세지 않는다.
+ * 덱이 없거나 휴지통에 있으면 Store가 던진 오류를 그대로 던진다.
+ */
+export const countDueOn: (
+  store: Store,
+  deckId: string,
+  studyDay: number,
+) => Promise<number> = async (store, deckId, studyDay) => {
+  return (await store.listCardsWithHistory(deckId)).filter(
+    (row) => scheduleCard(row.history)?.dueDay === studyDay,
+  ).length;
 };

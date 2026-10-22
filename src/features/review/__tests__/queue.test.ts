@@ -2,7 +2,7 @@ import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore, type Rating } from '@/storage/store';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 
-import { countQueue, listQueue } from '../queue';
+import { countDueOn, countQueue, listQueue } from '../queue';
 
 // 대기열은 Store가 읽어 주는 카드와 학습 이력에서 features/review가 만든다(ADR 0010).
 // 날짜는 Jest의 고정 TZ에서 시계를 해당 날의 정오로 옮겨 만든다(ADR 0013).
@@ -180,5 +180,42 @@ describe('countQueue', () => {
     await store.trashDeck(deck.id);
 
     expect(await countQueue(store, FIRST_DAY)).toEqual({});
+  });
+});
+
+describe('countDueOn', () => {
+  // 복습 끝 화면의 "내일 N장". 신규 카드와 밀린 카드는 세지 않는다.
+  test('덱에서 복습일이 정확히 그날인 카드만 센다', async () => {
+    const { store, deck, card: missed, rate } = await openWithCard();
+    const unsure = await store.createCard(deck.id, { front: 'pear', back: '배' });
+    const known = await store.createCard(deck.id, { front: 'plum', back: '자두' });
+    await store.createCard(deck.id, { front: 'fig', back: '무화과' });
+    await rate(missed.id, 'dont');
+    await rate(unsure.id, 'unsure');
+    await rate(known.id, 'know');
+
+    expect(await countDueOn(store, deck.id, FIRST_DAY + 1)).toBe(1);
+    expect(await countDueOn(store, deck.id, FIRST_DAY + 2)).toBe(1);
+    expect(await countDueOn(store, deck.id, FIRST_DAY + 3)).toBe(1);
+  });
+
+  test('휴지통의 카드와 다른 덱의 카드는 세지 않는다', async () => {
+    const { store, deck, card, rate } = await openWithCard();
+    const other = await store.createDeck({ name: '다른 덱' });
+    const elsewhere = await store.createCard(other.id, { front: 'pear', back: '배' });
+    const trashed = await store.createCard(deck.id, { front: 'plum', back: '자두' });
+    await rate(card.id, 'dont');
+    await rate(elsewhere.id, 'dont');
+    await rate(trashed.id, 'dont');
+    await store.trashCard(trashed.id);
+
+    expect(await countDueOn(store, deck.id, FIRST_DAY + 1)).toBe(1);
+  });
+
+  test('덱이 없거나 휴지통에 있으면 거부한다', async () => {
+    const { store, deck } = await openWithCard();
+    await store.trashDeck(deck.id);
+
+    await expect(countDueOn(store, deck.id, FIRST_DAY + 1)).rejects.toThrow();
   });
 });
