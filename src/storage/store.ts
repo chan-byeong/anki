@@ -1,3 +1,5 @@
+import { studyDayOf } from '@/utils/study-day';
+
 import type { CardRow, DeckRow, Port, PortTables, ReviewRow } from './port';
 
 // 도메인 동작과 규칙을 한 번만 두는 곳(ADR 0010). 동작 하나가 트랜잭션 하나이고,
@@ -35,6 +37,8 @@ export type Review = {
   studyDay: number;
   ratedAt: number;
 };
+
+export type CardWithHistory = { card: Card; history: Review[] };
 
 export type Trash = {
   decks: (Deck & { deletedAt: number })[];
@@ -100,11 +104,6 @@ export interface Store {
   listDecks(): Promise<Deck[]>;
   /** 살아 있는 덱만. 휴지통의 덱은 listTrash로 본다. */
   getDeck(deckId: string): Promise<Deck | null>;
-  /**
-   * 살아 있는 덱마다 평가를 한 번도 받지 않은 살아 있는 카드 수. 카드가 없는 덱은 0이다.
-   * 복습일을 계산하지 않는다. 신규 카드는 바로 복습일이 되므로 오늘 복습할 카드의 일부다.
-   */
-  countUnreviewedCards(): Promise<Record<string, number>>;
   updateDeck(deckId: string, patch: DeckPatch): Promise<Deck>;
   /** 덱과 그 시점에 휴지통에 없는 카드에 같은 op ID를 남긴다(ADR 0011). */
   trashDeck(deckId: string): Promise<void>;
@@ -116,10 +115,11 @@ export interface Store {
   /** 덱이 없거나 휴지통에 있으면 거부한다. 빈 덱과 구분하기 위해서다. */
   listCards(deckId: string): Promise<Card[]>;
   /**
-   * 덱에서 평가를 한 번도 받지 않은 살아 있는 카드를 만든 순서대로. countUnreviewedCards의 목록판이다.
-   * 복습일을 계산하지 않는다. 덱이 없거나 휴지통에 있으면 거부한다.
+   * 덱의 살아 있는 카드를 만든 순서대로, 카드마다 학습 이력(평가 시각 순서)과 함께 한 트랜잭션에서 읽는다.
+   * 이력이 없는 카드의 history는 빈 배열이다. 복습일이나 대기열은 계산하지 않는다(ADR 0010).
+   * 덱이 없거나 휴지통에 있으면 거부한다.
    */
-  listUnreviewedCards(deckId: string): Promise<Card[]>;
+  listCardsWithHistory(deckId: string): Promise<CardWithHistory[]>;
   updateCard(cardId: string, patch: CardPatch): Promise<Card>;
   trashCard(cardId: string): Promise<void>;
 
@@ -147,14 +147,6 @@ export interface Store {
   /** 카드가 살아 있지 않으면 거부한다. getCard와 같은 기준이다. */
   listReviewHistory(cardId: string): Promise<Review[]>;
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// 기기의 현재 날짜를 1970-01-01부터 센 일수로(ADR 0013).
-const studyDayOf = (ms: number): number => {
-  const date = new Date(ms);
-  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
-};
 
 const toDeck = (row: DeckRow): Deck => ({
   id: row.id,
@@ -318,17 +310,6 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     return row !== null && isAlive(row) ? toDeck(row) : null;
   },
 
-  async countUnreviewedCards() {
-    return port.transaction(async (tx) => {
-      const counts: Record<string, number> = {};
-      for (const deck of await tx.decks.listAlive()) counts[deck.id] = 0;
-      for (const { deck_id, count } of await tx.cards.countUnreviewedAliveByDeck()) {
-        if (deck_id in counts) counts[deck_id] = count;
-      }
-      return counts;
-    });
-  },
-
   async updateDeck(deckId, patch) {
     requireText(patch.name, '덱 이름');
     return port.transaction(async (tx) => {
@@ -392,11 +373,17 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     });
   },
 
-  async listUnreviewedCards(deckId) {
-    return port.transaction(async (tx) => {
+  async listCardsWithHistory(deckId) {
+    const cardWithHistory: CardWithHistory[] = [];
+    await port.transaction(async (tx) => {
       await findAliveDeck(tx, deckId);
-      return (await tx.cards.listUnreviewedAliveByDeck(deckId)).map(toCard);
+      const liveCards = (await tx.cards.listAliveByDeck(deckId)).map(toCard);
+      for (const card of liveCards) {
+        const reviews = (await tx.reviews.listByCard(card.id)).map(toReview);
+        cardWithHistory.push({ card, history: reviews });
+      }
     });
+    return cardWithHistory;
   },
 
   async updateCard(cardId, patch) {

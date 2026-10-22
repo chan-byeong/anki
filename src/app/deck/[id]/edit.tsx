@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import { DeckForm, DeckFormFrame, DeckFormUnavailable } from '@/features/decks/DeckForm';
+import { DeckForm, DeckFormFrame, DeckFormUnavailable } from '@/features/decks/components/DeckForm';
 import { useDeck } from '@/features/decks/use-deck';
 
 export default function EditDeckScreen() {

@@ -356,64 +356,101 @@ export const describeStoreContract = (
       });
     });
 
-    describe('평가하지 않은 카드 목록', () => {
-      test('덱에서 평가 기록이 없는 살아 있는 카드를 만든 순서대로 돌려준다', async () => {
-        const { store } = await harness.open();
-        const words = await store.createDeck({ name: '영어 단어' });
+    const openWithCard = async () => {
+      const { store } = await harness.open();
+      const deck = await store.createDeck({ name: '영어 단어' });
+      const card = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+      return { store, deck, card };
+    };
+
+    // Store는 사실만 읽는다. 대기열 같은 파생 값은 features/review가 이 목록에서 만든다(ADR 0010).
+    describe('카드와 학습 이력', () => {
+      test('덱의 살아 있는 카드를 만든 순서대로 카드별 학습 이력과 함께 돌려준다', async () => {
+        const { store, deck, card: apple } = await openWithCard();
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        const grape = await store.createCard(deck.id, { front: 'grape', back: '포도' });
         const other = await store.createDeck({ name: '개발 지식' });
-        const apple = await store.createCard(words.id, { front: 'apple', back: '사과' });
-        const rated = await store.createCard(words.id, { front: 'pear', back: '배' });
-        const trashed = await store.createCard(words.id, { front: 'grape', back: '포도' });
-        const grape = await store.createCard(words.id, { front: 'plum', back: '자두' });
-        await store.createCard(other.id, { front: 'git', back: '버전 관리' });
-        await store.rateCard(rated.id, { id: 'review-1', rating: 'know', hintUsed: false });
-        await store.trashCard(trashed.id);
+        const git = await store.createCard(other.id, { front: 'git', back: '버전 관리' });
+        const first = await store.rateCard(apple.id, {
+          id: 'review-1',
+          rating: 'dont',
+          hintUsed: false,
+        });
+        const second = await store.rateCard(apple.id, {
+          id: 'review-2',
+          rating: 'know',
+          hintUsed: true,
+        });
+        await store.rateCard(git.id, { id: 'review-3', rating: 'know', hintUsed: false });
+        await store.rateCard(grape.id, { id: 'review-4', rating: 'unsure', hintUsed: false });
+        await store.trashCard(grape.id);
 
-        const cards = await store.listUnreviewedCards(words.id);
-
-        expect(cards.map((card) => card.id)).toEqual([apple.id, grape.id]);
+        expect(await store.listCardsWithHistory(deck.id)).toEqual([
+          { card: apple, history: [first, second] },
+          { card: pear, history: [] },
+        ]);
       });
 
-      test('카드가 없는 덱은 빈 목록이다', async () => {
-        const { store } = await harness.open();
-        const deck = await store.createDeck({ name: '빈 덱' });
+      test('학습 이력은 평가 시각 순서이고 listReviewHistory와 같다', async () => {
+        const { store, deck, card } = await openWithCard();
+        harness.clock.set(5000);
+        const later = await store.rateCard(card.id, {
+          id: 'review-1',
+          rating: 'know',
+          hintUsed: false,
+        });
+        harness.clock.set(2000);
+        const earlier = await store.rateCard(card.id, {
+          id: 'review-2',
+          rating: 'dont',
+          hintUsed: false,
+        });
 
-        expect(await store.listUnreviewedCards(deck.id)).toEqual([]);
+        const [entry] = await store.listCardsWithHistory(deck.id);
+
+        expect(entry.history).toEqual([earlier, later]);
+        expect(entry.history).toEqual(await store.listReviewHistory(card.id));
       });
 
       test('덱이 없거나 휴지통에 있으면 거부한다', async () => {
-        const { store } = await harness.open();
-        const deck = await store.createDeck({ name: '영어 단어' });
+        const { store, deck } = await openWithCard();
         await store.trashDeck(deck.id);
 
-        await expect(store.listUnreviewedCards(deck.id)).rejects.toMatchObject({ code: 'trashed' });
-        await expect(store.listUnreviewedCards('none')).rejects.toMatchObject({
+        await expect(store.listCardsWithHistory(deck.id)).rejects.toMatchObject({
+          code: 'trashed',
+        });
+        await expect(store.listCardsWithHistory('none')).rejects.toMatchObject({
           code: 'not_found',
         });
       });
     });
 
-    describe('평가하지 않은 카드 수', () => {
-      test('살아 있는 덱마다 평가 기록이 없는 살아 있는 카드를 센다', async () => {
-        const { store } = await harness.open();
-        const words = await store.createDeck({ name: '영어 단어' });
-        const empty = await store.createDeck({ name: '빈 덱' });
-        await store.createCard(words.id, { front: 'apple', back: '사과' });
-        const rated = await store.createCard(words.id, { front: 'pear', back: '배' });
-        const trashed = await store.createCard(words.id, { front: 'grape', back: '포도' });
-        await store.rateCard(rated.id, { id: 'review-1', rating: 'know', hintUsed: false });
-        await store.trashCard(trashed.id);
+    describe('학습 이력 기록', () => {
+      test('평가마다 원본 평가, 힌트 사용 여부, 학습일, 평가 시각을 남긴다', async () => {
+        const { store, card } = await openWithCard();
+        harness.clock.set(new Date(2026, 0, 1, 12).getTime());
+        await store.rateCard(card.id, { id: 'review-1', rating: 'unsure', hintUsed: true });
+        harness.clock.set(new Date(2026, 0, 3, 9, 30).getTime());
+        await store.rateCard(card.id, { id: 'review-2', rating: 'know', hintUsed: false });
 
-        expect(await store.countUnreviewedCards()).toEqual({ [words.id]: 1, [empty.id]: 0 });
-      });
-
-      test('휴지통에 있는 덱은 빠진다', async () => {
-        const { store } = await harness.open();
-        const deck = await store.createDeck({ name: '영어 단어' });
-        await store.createCard(deck.id, { front: 'apple', back: '사과' });
-        await store.trashDeck(deck.id);
-
-        expect(await store.countUnreviewedCards()).toEqual({});
+        expect(await store.listReviewHistory(card.id)).toEqual([
+          {
+            id: 'review-1',
+            cardId: card.id,
+            rating: 'unsure',
+            hintUsed: true,
+            studyDay: 20454,
+            ratedAt: new Date(2026, 0, 1, 12).getTime(),
+          },
+          {
+            id: 'review-2',
+            cardId: card.id,
+            rating: 'know',
+            hintUsed: false,
+            studyDay: 20456,
+            ratedAt: new Date(2026, 0, 3, 9, 30).getTime(),
+          },
+        ]);
       });
     });
   });

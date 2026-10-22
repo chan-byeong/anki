@@ -4,8 +4,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, MoreIcon, Notice, PageHeader, PlusIcon, Sheet, TopBar } from '@/components';
-import { CardRow } from '@/features/cards/CardRow';
-import { CardSearchField } from '@/features/cards/CardSearchField';
+import { CardRow } from '@/features/cards/components/CardRow';
+import { CardSearchField } from '@/features/cards/components/CardSearchField';
 import { searchCards } from '@/features/cards/search-cards';
 import { useDeckCards } from '@/features/cards/use-deck-cards';
 import { useDeck } from '@/features/decks/use-deck';

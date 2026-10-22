@@ -1,8 +1,10 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
+import { countQueue } from '@/features/review/queue';
 import type { Deck, Store } from '@/storage/store';
 import { useStore } from '@/storage/StoreProvider';
+import { studyDayOf } from '@/utils/study-day';
 
 export interface DeckListItem {
   deck: Deck;
@@ -13,10 +15,9 @@ export interface DeckListItem {
 export type DeckListState =
   { kind: 'loading' } | { kind: 'ready'; items: DeckListItem[] } | { kind: 'failed' };
 
-// 임시 기준: 평가하지 않은 카드(신규 카드) 수. 신규 카드는 만들자마자 복습일이 되므로 오늘 복습할 카드의 일부이고,
-// 평가가 생기기 전에는 전부다. STA-118에서 학습 이력으로 계산한 복습일 기준으로 바꾼다.
+// 오늘 복습할 카드 수. 복습일이 된 카드와 오늘 다시 봐야 하는 카드의 수다(ADR 0003).
 export const todayCountOf = async (store: Store): Promise<Record<string, number>> =>
-  store.countUnreviewedCards();
+  countQueue(store, studyDayOf(Date.now()));
 
 // 화면에 들어올 때마다 다시 읽는다. 덱 만들기 같은 다른 화면에서 돌아오면 바로 반영된다.
 export function useDeckList(): DeckListState {
