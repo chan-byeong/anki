@@ -98,6 +98,8 @@ export interface PortTables {
     get(id: string): Promise<ReviewRow | null>;
     /** 카드의 학습 이력을 rated_at 오름차순으로. 일정 계산은 스스로 정렬하므로 이 순서에 의존하지 않는다(ADR 0015). */
     listByCard(cardId: string): Promise<ReviewRow[]>;
+    /** 학습일별 평가 횟수를 학습일 오름차순으로. 휴지통에 있는 카드의 이력도 센다. */
+    countByStudyDay(): Promise<{ study_day: number; count: number }[]>;
   };
   tombstones: {
     /** 같은 ID를 다시 받아도 한 행으로 남는다. */
