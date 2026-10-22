@@ -41,7 +41,8 @@ export type Review = {
 export type CardWithHistory = { card: Card; history: Review[] };
 
 export type Trash = {
-  decks: (Deck & { deletedAt: number })[];
+  /** cardCount는 덱과 같은 작업으로 함께 삭제된 카드 수다. 먼저 따로 지운 카드는 세지 않는다. */
+  decks: (Deck & { deletedAt: number; cardCount: number })[];
   /** 따로 휴지통에 넣은 카드. 휴지통에 있는 덱의 카드는 덱과 함께 다룬다. */
   cards: (Card & { deletedAt: number })[];
 };
@@ -409,11 +410,20 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     return port.transaction(async (tx) => {
       const decks = await tx.decks.listTrashed();
       const trashedDeckIds = new Set(decks.map((deck) => deck.id));
+      // 트랜잭션 안에서는 차례로 읽는다.
+      const trashedDecks = [];
+      for (const row of decks) {
+        const cardCount =
+          row.deleted_by_op === null
+            ? 0
+            : (await tx.cards.listByDeleteOp(row.deleted_by_op)).length;
+        trashedDecks.push({ ...toTrashed(row, toDeck), cardCount });
+      }
       const cards = (await tx.cards.listTrashed()).filter(
         (card) => !trashedDeckIds.has(card.deck_id),
       );
       return {
-        decks: decks.map((row) => toTrashed(row, toDeck)),
+        decks: trashedDecks,
         cards: cards.map((row) => toTrashed(row, toCard)),
       };
     });

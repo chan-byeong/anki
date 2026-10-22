@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Field, Notice, TopBar } from '@/components';
+import { Button, Field, Notice, TopBar, TrashIcon } from '@/components';
 import { useCard } from '@/features/cards/use-card';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import type { Card } from '@/storage/store';
@@ -14,12 +14,24 @@ import { space } from '@/theme/tokens';
 const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 // 카드 편집(Card-2). 앞면·뒷면·메모를 고친다.
-// 덱 바꾸기, 이미지, 카드 삭제는 이 화면에 더하지 않았다(각각 STA-129, STA-131 등).
+// 위쪽의 삭제 버튼은 확인 없이 카드를 휴지통으로 보낸다(복구할 수 있다). 덱 바꾸기와 이미지는 이 화면에 더하지 않았다.
 export default function EditCardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useCard(id);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const store = useStore();
+  const [trashFailed, setTrashFailed] = useState(false);
+
+  const trash = async () => {
+    setTrashFailed(false);
+    try {
+      await store.trashCard(id);
+      close();
+    } catch {
+      setTrashFailed(true);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -30,7 +42,22 @@ export default function EditCardScreen() {
         { backgroundColor: colors.bg, paddingTop: Platform.OS === 'ios' ? 0 : insets.top },
       ]}
     >
-      <TopBar leading="close" leadingLabel="닫기" onLeadingPress={close} title="카드 편집" />
+      <TopBar
+        leading="close"
+        leadingLabel="닫기"
+        onLeadingPress={close}
+        title="카드 편집"
+        trailing={
+          state.kind === 'ready'
+            ? [{ icon: TrashIcon, label: '카드 삭제 (휴지통으로)', onPress: trash }]
+            : []
+        }
+      />
+      {trashFailed ? (
+        <View style={styles.notice}>
+          <Notice tone="danger" title="카드를 삭제하지 못했어요" body="잠시 뒤 다시 해 주세요." />
+        </View>
+      ) : null}
       {state.kind === 'ready' ? <EditForm card={state.card} /> : null}
       {state.kind === 'missing' || state.kind === 'failed' ? (
         <View style={styles.notice}>
