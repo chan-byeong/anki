@@ -34,15 +34,41 @@ describe('nextQueue', () => {
     expect(next).toEqual({ queue: [], card: null, remaining: 0 });
   });
 
-  // 재등장 위치는 STA-122가 바꾸기 전까지 임시로 맨 뒤다.
-  test('방금 본 카드가 대기열에 남으면 맨 뒤로 재등장하고 남은 카드는 그대로다', () => {
-    const [a, b, c] = ['a', 'b', 'c'].map(cardOf);
+  // 재등장 위치는 다른 카드 3~10장 뒤다. 난수를 [0, 1)로 주입해 3(0)부터 10(0.999)까지 고른다.
+  describe('재등장 위치', () => {
+    const cardsOf = (count: number): Card[] =>
+      Array.from({ length: count }, (_, index) => cardOf(`c${index}`));
 
-    const next = nextQueue([a, b, c], true);
+    test.each<{ random: number; gap: number }>([
+      { random: 0, gap: 3 },
+      { random: 0.5, gap: 7 },
+      { random: 0.999, gap: 10 },
+    ])('난수 $random이면 다른 카드 $gap장 뒤에 다시 나온다', ({ random, gap }) => {
+      const queue = cardsOf(15);
+      const [reviewed, ...rest] = queue;
 
-    expect(next.card).toEqual(b);
-    expect(next.remaining).toBe(3);
-    expect(next.queue).toEqual([b, c, a]);
+      const next = nextQueue(queue, true, () => random);
+
+      expect(next.queue).toEqual([...rest.slice(0, gap), reviewed, ...rest.slice(gap)]);
+      expect(next.remaining).toBe(15);
+    });
+
+    test('남은 다른 카드가 3장 미만이면 가능한 한 뒤인 맨 뒤에 다시 나온다', () => {
+      const [a, b, c] = cardsOf(3);
+
+      const next = nextQueue([a, b, c], true, () => 0);
+
+      expect(next.card).toEqual(b);
+      expect(next.queue).toEqual([b, c, a]);
+    });
+
+    test('남은 다른 카드가 10장보다 적어도 그 수를 넘겨 뒤로 가지 않는다', () => {
+      const [reviewed, ...rest] = cardsOf(6);
+
+      const next = nextQueue([reviewed, ...rest], true, () => 0.999);
+
+      expect(next.queue).toEqual([...rest, reviewed]);
+    });
   });
 
   test('한 장만 남았는데 대기열에 남으면 같은 카드가 다시 나온다', () => {
