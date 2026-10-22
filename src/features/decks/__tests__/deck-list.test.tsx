@@ -100,14 +100,15 @@ describe('덱 목록', () => {
     expect(screen.getByText(`/review/${words.id}`)).toBeOnTheScreen();
   });
 
-  test('줄 끝 버튼으로 덱 상세에 들어간다', async () => {
+  test('줄 끝 메뉴에서 덱 상세에 들어간다', async () => {
     const store = newStore();
     const words = await store.createDeck({ name: '영어 단어' });
     await store.createCard(words.id, { front: 'apple', back: '사과' });
     await renderApp(store);
     const user = setupUser();
 
-    await user.press(screen.getByRole('button', { name: '영어 단어 덱 상세' }));
+    await user.press(screen.getByRole('button', { name: '영어 단어 메뉴' }));
+    await user.press(await screen.findByRole('button', { name: '덱 상세' }));
 
     expect(screen.getByText(`/deck/${words.id}`)).toBeOnTheScreen();
   });

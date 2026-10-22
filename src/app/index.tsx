@@ -9,10 +9,12 @@ import {
   IconButton,
   Notice,
   PlusIcon,
+  Sheet,
   SettingsIcon,
   StatsIcon,
 } from '@/components';
 import { DeckRow } from '@/features/decks/components/DeckRow';
+import { useLongPressGuide } from '@/features/decks/use-long-press-guide';
 import { useDeckList, type DeckListItem } from '@/features/decks/use-deck-list';
 import { joinDeckIds } from '@/features/review/deck-ids';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -95,6 +97,8 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
   const { text } = useTheme();
   const insets = useSafeAreaInsets();
   const allDone = items.every((item) => item.todayCount === 0);
+  const [menuDeckId, setMenuDeckId] = useState<string | null>(null);
+  const guide = useLongPressGuide(!allDone);
   const selectedCount = items
     .filter(({ deck }) => selected?.includes(deck.id))
     .reduce((sum, item) => sum + item.todayCount, 0);
@@ -114,6 +118,15 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
 
   return (
     <>
+      {guide.visible && selected === null ? (
+        <View style={styles.guide}>
+          <Notice
+            line
+            title="덱을 길게 누르면 여러 덱을 함께 복습할 수 있어요"
+            action={{ label: '닫기', onPress: guide.dismiss }}
+          />
+        </View>
+      ) : null}
       <ScrollView style={styles.fill} contentContainerStyle={styles.list}>
         <View accessibilityRole="list" accessibilityLabel="덱 목록">
           {items.map(({ deck, todayCount }, index) => (
@@ -125,6 +138,7 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
                 router.push({ pathname: '/review/[deckId]', params: { deckId: deck.id } })
               }
               onOpenDeck={() => router.push({ pathname: '/deck/[id]', params: { id: deck.id } })}
+              onOpenMenu={() => setMenuDeckId(deck.id)}
               onEnterSelect={() => onSelectedChange([deck.id])}
               selected={selected === null ? undefined : selected.includes(deck.id)}
               onToggleSelect={() => toggle(deck.id)}
@@ -148,6 +162,19 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
           <Text style={text('body', { weight: 'bold' })}>오늘 복습할 카드 없음</Text>
         </View>
       ) : null}
+      <Sheet
+        visible={menuDeckId !== null}
+        kind="menu"
+        onClose={() => setMenuDeckId(null)}
+        actions={[
+          {
+            label: '덱 상세',
+            onPress: () =>
+              router.push({ pathname: '/deck/[id]', params: { id: menuDeckId ?? '' } }),
+          },
+          { label: '여러 덱 선택', onPress: () => onSelectedChange([menuDeckId ?? '']) },
+        ]}
+      />
     </>
   );
 }
@@ -185,6 +212,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row' },
   selectHeader: { paddingLeft: size.edgeIcon, justifyContent: 'flex-start', gap: space[1] },
   notice: { padding: space[4] },
+  guide: { paddingHorizontal: space[4] },
   list: { paddingTop: space[3], paddingHorizontal: space[4] },
   empty: { flex: 1, justifyContent: 'center', paddingHorizontal: space[4], gap: space[2] },
   footer: { paddingTop: space[3], paddingHorizontal: space[4] },
