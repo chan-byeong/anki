@@ -86,6 +86,8 @@ export interface PortTables {
     listTrashed(): Promise<CardRow[]>;
     /** 같은 작업으로 함께 삭제된 카드. 덱을 복구할 때 되살릴 카드를 찾는 데 쓴다. */
     listByDeleteOp(opId: string): Promise<CardRow[]>;
+    /** 작업 ID마다 그 작업으로 함께 삭제된 카드 수. 카드가 없는 작업 ID는 0이다. 행을 읽지 않고 센다. */
+    countByDeleteOps(opIds: string[]): Promise<Record<string, number>>;
     /** 영구 삭제. 학습 이력은 외래 키 CASCADE로 함께 지워진다. */
     remove(id: string): Promise<void>;
     /** 삭제 표시와 상관없이 덱의 모든 카드를 created_at 오름차순으로. 덱을 영구 삭제할 때 쓴다(ADR 0014). */

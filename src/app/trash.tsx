@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,8 +7,7 @@ import { TrashRow } from '@/features/trash/components/TrashRow';
 import { useTrash } from '@/features/trash/use-trash';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
-
-const back = () => (router.canGoBack() ? router.back() : router.replace('/settings'));
+import { goBack } from '@/utils/go-back';
 
 // 휴지통(Trash-1, Trash-4). 삭제한 덱과 카드를 보여 준다. 복구와 영구 삭제는 STA-132, STA-133에서 더한다.
 export default function TrashScreen() {
@@ -20,7 +18,7 @@ export default function TrashScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      <TopBar leading="back" leadingLabel="설정으로" onLeadingPress={back} />
+      <TopBar leading="back" leadingLabel="설정으로" onLeadingPress={() => goBack('/settings')} />
       <PageHeader title="휴지통" caption="자동으로 비워지지 않아요. 복구하거나 직접 지워 주세요." />
       {state.kind === 'failed' ? (
         <View style={styles.notice}>

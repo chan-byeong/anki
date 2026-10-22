@@ -313,6 +313,29 @@ export const describeStoreContract = (
       });
     });
 
+    describe('휴지통 개수', () => {
+      test('덱과, 덱과 함께 지워지지 않은 카드만 센다', async () => {
+        const { store } = await harness.open();
+        expect(await store.countTrash()).toBe(0);
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const separate = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        await store.createCard(deck.id, { front: 'pear', back: '배' });
+        const other = await store.createDeck({ name: '개발 지식' });
+        const inOther = await store.createCard(other.id, { front: 'git', back: '버전 관리' });
+        await store.trashCard(separate.id);
+        await store.trashCard(inOther.id);
+        expect(await store.countTrash()).toBe(2);
+
+        await store.trashDeck(deck.id);
+
+        // 덱 1 + 다른 덱에서 따로 지운 카드 1. 먼저 따로 지운 카드는 덱과 함께 다룬다.
+        expect(await store.countTrash()).toBe(2);
+        expect(
+          (await store.listTrash()).decks.length + (await store.listTrash()).cards.length,
+        ).toBe(await store.countTrash());
+      });
+    });
+
     describe('동기화로 덱만 휴지통에 있는 카드', () => {
       // 다른 기기에서 덱을 휴지통에 넣는 사이 이 기기에서 카드를 되살린 상태를 포트로 직접 만든다.
       const openWithStrandedCard = async () => {

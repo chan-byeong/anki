@@ -1,17 +1,14 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
-import type { Trash } from '@/storage/store';
+import type { Card, Trash } from '@/storage/store';
 import { useStore } from '@/storage/StoreProvider';
 
-export interface TrashedCard {
-  id: string;
-  front: string;
-  back: string;
+export type TrashedCard = Pick<Card, 'id' | 'front' | 'back'> & {
   /** 카드가 속했던 덱 이름. 덱을 찾지 못하면 빈 문자열이다. */
   deckName: string;
   deletedAt: number;
-}
+};
 
 export type TrashState =
   | { kind: 'loading' }

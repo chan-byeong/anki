@@ -126,6 +126,8 @@ export interface Store {
 
   // 휴지통
   listTrash(): Promise<Trash>;
+  /** 휴지통 목록의 항목 수(덱 + 따로 지운 카드). listTrash와 같은 기준이다. */
+  countTrash(): Promise<number>;
   /** 덱과 같은 작업으로 삭제된 카드만 되살린다. 따로 휴지통에 넣은 카드는 남는다. */
   restoreDeck(deckId: string): Promise<void>;
   /** 덱이 휴지통에 있으면 deck_trashed로 거부한다. 덱을 먼저 복구해야 한다. */
@@ -410,15 +412,12 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     return port.transaction(async (tx) => {
       const decks = await tx.decks.listTrashed();
       const trashedDeckIds = new Set(decks.map((deck) => deck.id));
-      // 트랜잭션 안에서는 차례로 읽는다.
-      const trashedDecks = [];
-      for (const row of decks) {
-        const cardCount =
-          row.deleted_by_op === null
-            ? 0
-            : (await tx.cards.listByDeleteOp(row.deleted_by_op)).length;
-        trashedDecks.push({ ...toTrashed(row, toDeck), cardCount });
-      }
+      const opIds = decks.flatMap((row) => (row.deleted_by_op === null ? [] : [row.deleted_by_op]));
+      const counts = await tx.cards.countByDeleteOps(opIds);
+      const trashedDecks = decks.map((row) => ({
+        ...toTrashed(row, toDeck),
+        cardCount: row.deleted_by_op === null ? 0 : (counts[row.deleted_by_op] ?? 0),
+      }));
       const cards = (await tx.cards.listTrashed()).filter(
         (card) => !trashedDeckIds.has(card.deck_id),
       );
@@ -426,6 +425,17 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
         decks: trashedDecks,
         cards: cards.map((row) => toTrashed(row, toCard)),
       };
+    });
+  },
+
+  async countTrash() {
+    return port.transaction(async (tx) => {
+      const decks = await tx.decks.listTrashed();
+      const trashedDeckIds = new Set(decks.map((deck) => deck.id));
+      const cards = (await tx.cards.listTrashed()).filter(
+        (card) => !trashedDeckIds.has(card.deck_id),
+      );
+      return decks.length + cards.length;
     });
   },
 

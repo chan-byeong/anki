@@ -19,9 +19,11 @@ import { CardSearchField } from '@/features/cards/components/CardSearchField';
 import { searchCards } from '@/features/cards/search-cards';
 import { useDeckCards } from '@/features/cards/use-deck-cards';
 import { useDeck } from '@/features/decks/use-deck';
+import { useTrashAction } from '@/features/trash/use-trash-action';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
+import { goBack } from '@/utils/go-back';
 
 // 덱 상세(Deck-1, Deck-2, Deck-4). 메뉴의 덱 삭제는 확인 없이 덱을 카드와 함께 휴지통으로 보낸다(복구할 수 있다).
 export default function DeckScreen() {
@@ -31,29 +33,17 @@ export default function DeckScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const store = useStore();
+  const { trash: trashDeck, failed: trashFailed } = useTrashAction(
+    () => store.trashDeck(id),
+    () => goBack('/'),
+  );
   const [menuOpen, setMenuOpen] = useState(false);
-  const [trashFailed, setTrashFailed] = useState(false);
   const menuRef = useRef<View>(null);
   const [query, setQuery] = useState('');
 
   const addCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });
   const openCard = (cardId: string) =>
     router.push({ pathname: '/card/[id]', params: { id: cardId } });
-  // 두 번 눌러도 한 번만 보낸다. 두 번째는 이미 지워진 덱이라 거부되어 오류가 뜨기 때문이다.
-  const trashing = useRef(false);
-  const trashDeck = async () => {
-    if (trashing.current) return;
-    trashing.current = true;
-    setTrashFailed(false);
-    try {
-      await store.trashDeck(id);
-      if (router.canGoBack()) router.back();
-      else router.replace('/');
-    } catch {
-      setTrashFailed(true);
-      trashing.current = false;
-    }
-  };
   const startReview = () => router.push({ pathname: '/review/[deckId]', params: { deckId: id } });
   // 카드를 읽기 전에는 캡션을 비워 둔다. "카드 0장"이 잠깐 보였다 사라지지 않게 하기 위해서다.
   const caption =
@@ -68,7 +58,7 @@ export default function DeckScreen() {
       <TopBar
         leading="back"
         leadingLabel="덱 목록으로"
-        onLeadingPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onLeadingPress={() => goBack('/')}
         trailing={
           state.kind === 'ready'
             ? [

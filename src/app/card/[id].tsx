@@ -1,17 +1,19 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Field, Notice, TopBar, TrashIcon } from '@/components';
 import { useCard } from '@/features/cards/use-card';
+import { useTrashAction } from '@/features/trash/use-trash-action';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import type { Card } from '@/storage/store';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
+import { goBack } from '@/utils/go-back';
 
-const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+const close = () => goBack('/');
 
 // 카드 편집(Card-2). 앞면·뒷면·메모를 고친다.
 // 위쪽의 삭제 버튼은 확인 없이 카드를 휴지통으로 보낸다(복구할 수 있다). 덱 바꾸기와 이미지는 이 화면에 더하지 않았다.
@@ -21,22 +23,8 @@ export default function EditCardScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const store = useStore();
-  const [trashFailed, setTrashFailed] = useState(false);
 
-  // 두 번 눌러도 한 번만 보낸다. 두 번째는 이미 지워진 카드라 거부되어 오류가 뜨기 때문이다.
-  const trashing = useRef(false);
-  const trash = async () => {
-    if (trashing.current) return;
-    trashing.current = true;
-    setTrashFailed(false);
-    try {
-      await store.trashCard(id);
-      close();
-    } catch {
-      setTrashFailed(true);
-      trashing.current = false;
-    }
-  };
+  const { trash, failed: trashFailed } = useTrashAction(() => store.trashCard(id), close);
 
   return (
     <KeyboardAvoidingView
