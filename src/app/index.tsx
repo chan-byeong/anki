@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Button,
+  CloseIcon,
   IconButton,
   InboxIcon,
   Notice,
@@ -13,6 +15,7 @@ import {
 } from '@/components';
 import { DeckRow } from '@/features/decks/components/DeckRow';
 import { useDeckList, type DeckListItem } from '@/features/decks/use-deck-list';
+import { joinDeckIds } from '@/features/review/deck-ids';
 import { useLowSpace } from '@/features/storage-status/use-low-space';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
@@ -24,19 +27,35 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const state = useDeckList();
   const lowSpace = useLowSpace();
+  // 여러 덱 선택 모드. null이면 선택 모드가 아니고, 아니면 선택한 덱 ID들이다.
+  const [selected, setSelected] = useState<string[] | null>(null);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={text('display', { weight: 'bold' })}>
-          덱
-        </Text>
-        <View style={styles.actions}>
-          <IconButton icon={PlusIcon} label="덱 추가" onPress={openNewDeck} />
-          <IconButton icon={StatsIcon} label="통계" onPress={() => router.push('/stats')} />
-          <IconButton icon={SettingsIcon} label="설정" onPress={() => router.push('/settings')} />
+      {selected === null ? (
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={text('display', { weight: 'bold' })}>
+            덱
+          </Text>
+          <View style={styles.actions}>
+            <IconButton icon={PlusIcon} label="덱 추가" onPress={openNewDeck} />
+            <IconButton icon={StatsIcon} label="통계" onPress={() => router.push('/stats')} />
+            <IconButton icon={SettingsIcon} label="설정" onPress={() => router.push('/settings')} />
+          </View>
         </View>
-      </View>
+      ) : (
+        <View style={[styles.header, styles.selectHeader]}>
+          <IconButton icon={CloseIcon} label="선택 끝내기" onPress={() => setSelected(null)} />
+          <Text
+            accessibilityRole="header"
+            accessibilityLiveRegion="polite"
+            aria-live="polite"
+            style={text('title', { weight: 'bold' })}
+          >
+            {`${selected.length}개 선택`}
+          </Text>
+        </View>
+      )}
       {lowSpace ? (
         <View style={styles.lowSpace}>
           <Notice
@@ -54,15 +73,39 @@ export default function HomeScreen() {
         </View>
       ) : null}
       {state.kind === 'ready' && state.items.length === 0 ? <EmptyDecks /> : null}
-      {state.kind === 'ready' && state.items.length > 0 ? <DeckList items={state.items} /> : null}
+      {state.kind === 'ready' && state.items.length > 0 ? (
+        <DeckList items={state.items} selected={selected} onSelectedChange={setSelected} />
+      ) : null}
     </View>
   );
 }
 
-function DeckList({ items }: { items: DeckListItem[] }) {
+interface DeckListProps {
+  items: DeckListItem[];
+  selected: string[] | null;
+  onSelectedChange: (selected: string[] | null) => void;
+}
+
+function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
   const { text } = useTheme();
   const insets = useSafeAreaInsets();
   const allDone = items.every((item) => item.todayCount === 0);
+  const selectedCount = items
+    .filter(({ deck }) => selected?.includes(deck.id))
+    .reduce((sum, item) => sum + item.todayCount, 0);
+
+  const toggle = (deckId: string) => {
+    if (selected === null) return;
+    onSelectedChange(
+      selected.includes(deckId) ? selected.filter((id) => id !== deckId) : [...selected, deckId],
+    );
+  };
+  // 목록에 보이는 순서대로 이어서 같은 선택은 같은 경로가 된다.
+  const startSelected = () => {
+    const deckIds = items.map(({ deck }) => deck.id).filter((id) => selected?.includes(id));
+    onSelectedChange(null);
+    router.push({ pathname: '/review/[deckId]', params: { deckId: joinDeckIds(deckIds) } });
+  };
 
   return (
     <>
@@ -77,13 +120,25 @@ function DeckList({ items }: { items: DeckListItem[] }) {
                 router.push({ pathname: '/review/[deckId]', params: { deckId: deck.id } })
               }
               onOpenDeck={() => router.push({ pathname: '/deck/[id]', params: { id: deck.id } })}
+              onEnterSelect={() => onSelectedChange([deck.id])}
+              selected={selected === null ? undefined : selected.includes(deck.id)}
+              onToggleSelect={() => toggle(deck.id)}
               last={index === items.length - 1}
             />
           ))}
         </View>
       </ScrollView>
       {/* 다음 복습일 줄("내일 42장")은 복습일 계산이 생기는 STA-118 이후에 더한다. */}
-      {allDone ? (
+      {selected !== null ? (
+        <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
+          <Button
+            label="복습 시작"
+            count={`${selectedCount}장`}
+            disabled={selectedCount === 0}
+            onPress={startSelected}
+          />
+        </View>
+      ) : allDone ? (
         <View style={[styles.footer, styles.centered, { paddingBottom: space[2] + insets.bottom }]}>
           <Text style={text('body', { weight: 'bold' })}>오늘 복습할 카드 없음</Text>
         </View>
@@ -123,6 +178,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   actions: { flexDirection: 'row' },
+  selectHeader: { paddingLeft: size.edgeIcon, justifyContent: 'flex-start', gap: space[1] },
   notice: { padding: space[4] },
   lowSpace: { paddingTop: space[2], paddingHorizontal: space[4] },
   list: { paddingTop: space[3], paddingHorizontal: space[4] },

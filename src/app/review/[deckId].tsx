@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Notice } from '@/components';
 import { ReviewBar } from '@/features/review/components/ReviewBar';
 import { ReviewFlow } from '@/features/review/components/ReviewFlow';
+import { parseDeckIds } from '@/features/review/deck-ids';
 import { useReviewQueue } from '@/features/review/use-review-queue';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
@@ -18,9 +19,15 @@ export default function ReviewScreen() {
   const insets = useSafeAreaInsets();
   const empty = queue.kind === 'ready' && queue.cards.length === 0;
 
-  // 복습할 카드가 없는 덱은 덱 상세로 보낸다. 복습 화면이 스택에 남지 않게 바꿔 끼운다.
+  // 복습할 카드가 없으면 덱 상세로(여러 덱이면 덱 목록으로) 보낸다. 복습 화면이 스택에 남지 않게 바꿔 끼운다.
   useEffect(() => {
-    if (empty) router.replace({ pathname: '/deck/[id]', params: { id: deckId } });
+    if (!empty) return;
+    const [only, ...others] = parseDeckIds(deckId);
+    if (only !== undefined && others.length === 0) {
+      router.replace({ pathname: '/deck/[id]', params: { id: only } });
+    } else {
+      router.replace('/');
+    }
   }, [empty, deckId]);
 
   return (
