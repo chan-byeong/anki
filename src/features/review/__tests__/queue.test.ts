@@ -150,6 +150,31 @@ describe('listQueue', () => {
   });
 });
 
+describe('삭제한 덱과 카드', () => {
+  // 삭제한 덱의 카드는 대기열과 복습할 카드 수에서 빠진다. 삭제한 카드도 마찬가지다.
+  test('덱을 휴지통에 넣으면 그 덱의 카드가 복습할 카드 수에서 빠지고 대기열은 거부한다', async () => {
+    const { store, deck } = await openWithCard();
+    const other = await store.createDeck({ name: '개발 지식' });
+    await store.createCard(other.id, { front: 'git', back: '버전 관리' });
+    expect((await countQueue(store, FIRST_DAY))[deck.id]).toBe(1);
+
+    await store.trashDeck(deck.id);
+
+    expect(Object.keys(await countQueue(store, FIRST_DAY))).toEqual([other.id]);
+    await expect(listQueue(store, deck.id, FIRST_DAY)).rejects.toMatchObject({ code: 'trashed' });
+  });
+
+  test('카드를 휴지통에 넣으면 대기열과 복습할 카드 수에서 빠진다', async () => {
+    const { store, deck, card } = await openWithCard();
+    const kept = await store.createCard(deck.id, { front: 'pear', back: '배' });
+
+    await store.trashCard(card.id);
+
+    expect((await countQueue(store, FIRST_DAY))[deck.id]).toBe(1);
+    expect((await listQueue(store, deck.id, FIRST_DAY)).map(({ id }) => id)).toEqual([kept.id]);
+  });
+});
+
 describe('countQueue', () => {
   test('살아 있는 덱마다 대기열에 나오는 카드 수를 센다', async () => {
     const { store, deck: words, card: missed, rate } = await openWithCard();

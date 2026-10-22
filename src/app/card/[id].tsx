@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,13 +23,18 @@ export default function EditCardScreen() {
   const store = useStore();
   const [trashFailed, setTrashFailed] = useState(false);
 
+  // 두 번 눌러도 한 번만 보낸다. 두 번째는 이미 지워진 카드라 거부되어 오류가 뜨기 때문이다.
+  const trashing = useRef(false);
   const trash = async () => {
+    if (trashing.current) return;
+    trashing.current = true;
     setTrashFailed(false);
     try {
       await store.trashCard(id);
       close();
     } catch {
       setTrashFailed(true);
+      trashing.current = false;
     }
   };
 

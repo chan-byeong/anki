@@ -39,7 +39,11 @@ export default function DeckScreen() {
   const addCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });
   const openCard = (cardId: string) =>
     router.push({ pathname: '/card/[id]', params: { id: cardId } });
+  // 두 번 눌러도 한 번만 보낸다. 두 번째는 이미 지워진 덱이라 거부되어 오류가 뜨기 때문이다.
+  const trashing = useRef(false);
   const trashDeck = async () => {
+    if (trashing.current) return;
+    trashing.current = true;
     setTrashFailed(false);
     try {
       await store.trashDeck(id);
@@ -47,6 +51,7 @@ export default function DeckScreen() {
       else router.replace('/');
     } catch {
       setTrashFailed(true);
+      trashing.current = false;
     }
   };
   const startReview = () => router.push({ pathname: '/review/[deckId]', params: { deckId: id } });
