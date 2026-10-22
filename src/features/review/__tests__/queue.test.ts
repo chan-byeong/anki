@@ -127,6 +127,56 @@ describe('listQueue', () => {
     expect(ids).toEqual(expect.arrayContaining([reviewed.id, fresh.id]));
   });
 
+  describe('순서', () => {
+    const openWithCards = async (count: number) => {
+      const ctx = await openWithCard();
+      const cards = [ctx.card];
+      for (let i = 1; i < count; i += 1) {
+        cards.push(await ctx.store.createCard(ctx.deck.id, { front: `w${i}`, back: `b${i}` }));
+      }
+      return { ...ctx, cards };
+    };
+
+    test('복습일이 오래된 카드가 먼저 나오고 신규 카드가 그 뒤에 나온다', async () => {
+      const { store, deck, cards, rate } = await openWithCards(3);
+      const fresh = await store.createCard(deck.id, { front: 'new', back: '신규' });
+      await rate(cards[0].id, 'know'); // 복습일 3일째
+      await rate(cards[1].id, 'unsure'); // 복습일 2일째
+      await rate(cards[2].id, 'dont'); // 복습일 1일째
+
+      const ids = (await listQueue(store, deck.id, FIRST_DAY + 5)).map(({ id }) => id);
+
+      expect(ids).toEqual([cards[2].id, cards[1].id, cards[0].id, fresh.id]);
+    });
+
+    test('복습일이 같은 카드끼리는 주입한 난수로 순서를 섞는다', async () => {
+      const { store, deck, cards, rate } = await openWithCards(3);
+      for (const card of cards) await rate(card.id, 'know');
+      const ids = async (random: () => number) =>
+        (await listQueue(store, deck.id, FIRST_DAY + 3, random)).map(({ id }) => id);
+
+      const ascending = await ids(() => 0.99);
+      const reversed = await ids(() => 0);
+
+      expect([...ascending].sort()).toEqual(cards.map(({ id }) => id).sort());
+      expect(reversed).not.toEqual(ascending);
+    });
+
+    test('신규 카드끼리도 난수로 섞이지만 복습일이 된 카드 뒤에 온다', async () => {
+      const { store, deck, cards, rate } = await openWithCards(1);
+      const fresh = [
+        await store.createCard(deck.id, { front: 'n1', back: '1' }),
+        await store.createCard(deck.id, { front: 'n2', back: '2' }),
+      ];
+      await rate(cards[0].id, 'dont');
+
+      const ids = (await listQueue(store, deck.id, FIRST_DAY + 1, () => 0)).map(({ id }) => id);
+
+      expect(ids[0]).toBe(cards[0].id);
+      expect(ids.slice(1).sort()).toEqual(fresh.map(({ id }) => id).sort());
+    });
+  });
+
   test('휴지통의 카드와 다른 덱의 카드는 나오지 않는다', async () => {
     const { store, deck, card, queueIds } = await openWithCard();
     const other = await store.createDeck({ name: '개발 지식' });
