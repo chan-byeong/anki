@@ -75,6 +75,15 @@ export const MoreIcon: IconComponent = (props) => (
   </Glyph>
 );
 
+export const MemoIcon: IconComponent = (props) => (
+  <Glyph {...props}>
+    <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <Polyline points="14 2 14 8 20 8" />
+    <Line x1="16" y1="13" x2="8" y2="13" />
+    <Line x1="16" y1="17" x2="8" y2="17" />
+  </Glyph>
+);
+
 export const StatsIcon: IconComponent = (props) => (
   <Glyph {...props}>
     <Line x1="18" y1="20" x2="18" y2="10" />
