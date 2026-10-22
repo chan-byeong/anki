@@ -157,21 +157,40 @@ describe('복습 화면: 평가', () => {
     expect(screen.queryByText('사과')).toBeNull();
   });
 
-  test('실제 전환 API가 주입되지 않으면 평가를 저장하지 않는다', async () => {
+  test('전환이 주입되지 않으면 실제 전환으로 평가를 저장하고 다음 카드와 남은 수를 보인다', async () => {
     const { store, deck } = await seed();
+    const [apple] = await store.listCards(deck.id);
     const save = jest.spyOn(store, 'rateCard');
     await renderApp(store, `/review/${deck.id}`);
     const user = setupUser();
 
     await user.press(screen.getByRole('button', { name: '정답 확인' }));
+    await user.press(screen.getByRole('button', { name: '앎' }));
 
-    for (const name of ['모름', '헷갈림', '앎']) {
-      const button = screen.getByRole('button', { name });
-      expect(button).toBeDisabled();
-      await user.press(button);
-    }
-    expect(save).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(apple.id, expect.objectContaining({ rating: 'know' }));
+    expect(await screen.findByText('pear')).toBeOnTheScreen();
+    expect(screen.getByText('1장 남음')).toBeOnTheScreen();
     save.mockRestore();
+  });
+
+  test('전환이 주입되지 않아도 모름 카드는 대기열 맨 뒤에서 다시 나오고, 다 끝나면 복습 끝을 보인다', async () => {
+    const { store, deck } = await seed();
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+
+    for (const [name, next] of [
+      ['모름', 'pear'],
+      ['앎', 'apple'],
+      ['앎', null],
+    ] as const) {
+      await user.press(screen.getByRole('button', { name: '정답 확인' }));
+      await user.press(screen.getByRole('button', { name }));
+      if (next) expect(await screen.findByText(next)).toBeOnTheScreen();
+    }
+
+    expect(await screen.findByRole('header', { name: '오늘 복습 끝' })).toBeOnTheScreen();
+    expect(screen.getByText('3장을 봤어요')).toBeOnTheScreen();
   });
 });
 

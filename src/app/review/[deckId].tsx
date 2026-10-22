@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CheckIcon, CloseIcon, IconButton, Notice, RatingMark } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
+import { createNextCardAfterRating } from '@/features/review/next-card-after-rating';
 import type { ReviewScreenInput } from '@/features/review/review-screen-input';
 import { useReviewQueue } from '@/features/review/use-review-queue';
 import type { Card, RateInput, Rating, Review } from '@/storage/store';
@@ -43,6 +44,7 @@ export default function ReviewScreen(input: ReviewScreenInput = {}) {
           key={deckId}
           {...input}
           first={first}
+          cards={queue.cards}
           initialRemaining={queue.cards.length}
           insetBottom={insets.bottom}
         />
@@ -67,18 +69,23 @@ export default function ReviewScreen(input: ReviewScreenInput = {}) {
 
 interface ReviewFlowProps extends ReviewScreenInput {
   first: Card;
+  cards: Card[];
   initialRemaining: number;
   insetBottom: number;
 }
 
 function ReviewFlow({
   first,
+  cards,
   initialRemaining,
   insetBottom,
-  nextCardAfterRating,
+  nextCardAfterRating: injected,
   tomorrowCount,
 }: ReviewFlowProps) {
   const store = useStore();
+  // 주입이 없으면 복습을 시작할 때 읽은 대기열로 실제 전환을 만든다. 순서 상태는 이 복습 안에만 있다(ADR 0016).
+  const [defaultNextCardAfterRating] = useState(() => createNextCardAfterRating(store, cards));
+  const nextCardAfterRating = injected ?? defaultNextCardAfterRating;
   const { colors, text } = useTheme();
   const [progress, setProgress] = useState<{
     card: Card | null;
@@ -91,7 +98,7 @@ function ReviewFlow({
   const request = useRef<{ input: RateInput; review?: Review } | null>(null);
 
   const rate = async (rating: Rating) => {
-    if (!nextCardAfterRating || !progress.card || busy.current) return;
+    if (!progress.card || busy.current) return;
     if (request.current && request.current.input.rating !== rating) return;
     busy.current = true;
     setSaving(true);
@@ -138,7 +145,7 @@ function ReviewFlow({
         card={progress.card}
         insetBottom={insetBottom}
         onRate={rate}
-        ratingDisabled={!nextCardAfterRating || saving}
+        ratingDisabled={saving}
         pendingRating={pendingRating}
       />
     </>

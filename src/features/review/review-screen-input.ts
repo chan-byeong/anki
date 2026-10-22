@@ -1,12 +1,12 @@
 import type { Card, Review } from '@/storage/store';
 
-// Core의 계약만 둔다. 대기열 전환과 재등장 구현은 사용자가 별도로 연결한다.
+// 평가 뒤의 전환 계약. 구현은 next-card-after-rating.ts에 있고, 테스트는 이 자리로 대체 구현을 주입한다.
 export type NextCardAfterRating = (
   review: Review,
 ) => Promise<{ card: Card | null; remaining: number }>;
 
 export interface ReviewScreenInput {
-  // 미주입 상태에서는 평가를 저장하지 않는다.
+  // 주입이 없으면 화면이 복습을 시작할 때 읽은 대기열로 실제 전환(createNextCardAfterRating)을 만든다.
   nextCardAfterRating?: NextCardAfterRating;
   // 현재 덱에서 복습일이 정확히 내일인 카드 수. 일정 계산은 화면 밖에서 한다.
   tomorrowCount?: number;
