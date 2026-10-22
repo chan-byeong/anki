@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
+import { formatCount } from '@/utils/format-count';
 
 interface StatBlockProps {
   value: number;
@@ -14,7 +15,7 @@ interface StatBlockProps {
 // 큰 숫자 하나와 이름, 계산 기준. 한 덩어리로 읽힌다.
 export function StatBlock({ value, unit, label, basis }: StatBlockProps) {
   const { colors, text } = useTheme();
-  const shown = value.toLocaleString('en-US');
+  const shown = formatCount(value);
 
   return (
     <View accessible accessibilityLabel={`${label} ${shown}${unit}. ${basis}`} style={styles.block}>
