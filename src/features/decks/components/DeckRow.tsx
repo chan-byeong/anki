@@ -52,7 +52,7 @@ export function DeckRow({
           >
             {selected ? (
               <View style={[styles.circle, { backgroundColor: colors.text }]}>
-                <CheckIcon color={colors.inverse} size={14} />
+                <CheckIcon color={colors.inverse} size={14} strokeWidth={3} />
               </View>
             ) : (
               <View style={[styles.circle, { borderColor: colors.muted, borderWidth: 1.5 }]} />
@@ -67,7 +67,8 @@ export function DeckRow({
         >
           <Text
             style={[
-              text('body', { weight: 'bold' }),
+              // 캔버스: 오늘 끝난 덱은 굵지 않은 muted, 선택하지 않은 덱은 굵은 muted다.
+              text('body', { weight: done ? 'regular' : 'bold' }),
               styles.name,
               done || !selected ? { color: colors.muted } : null,
             ]}
