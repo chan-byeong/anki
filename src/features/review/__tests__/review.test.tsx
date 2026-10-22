@@ -80,8 +80,8 @@ describe('복습 화면: 평가', () => {
     '%s: 정답을 연 뒤에만 모름·헷갈림·앎 버튼이 순서대로 나타나고 마크는 장식이다',
     async (theme) => {
       const { store, deck } = await seed();
-      const advanceAfterRating = jest.fn().mockResolvedValue({ card: null, remaining: 0 });
-      await renderApp(store, `/review/${deck.id}`, { advanceAfterRating }, theme);
+      const nextCardAfterRating = jest.fn().mockResolvedValue({ card: null, remaining: 0 });
+      await renderApp(store, `/review/${deck.id}`, { nextCardAfterRating }, theme);
       const user = setupUser();
 
       for (const name of ['모름', '헷갈림', '앎']) {
@@ -116,8 +116,8 @@ describe('복습 화면: 평가', () => {
       const [apple, pear] = await store.listCards(deck.id);
       const save = jest.spyOn(store, 'rateCard');
       // 다음 카드와 남은 수는 core가 결정한다. 화면이 배열 인덱스나 길이로 계산하면 안 된다.
-      const advanceAfterRating = jest.fn().mockResolvedValue({ card: pear, remaining: 7 });
-      await renderApp(store, `/review/${deck.id}`, { advanceAfterRating });
+      const nextCardAfterRating = jest.fn().mockResolvedValue({ card: pear, remaining: 7 });
+      await renderApp(store, `/review/${deck.id}`, { nextCardAfterRating });
       const user = setupUser();
 
       await user.press(screen.getByRole('button', { name: '정답 확인' }));
@@ -132,7 +132,7 @@ describe('복습 화면: 평가', () => {
         hintUsed: false,
       });
       const [review] = await store.listReviewHistory(apple.id);
-      expect(advanceAfterRating).toHaveBeenCalledWith(review);
+      expect(nextCardAfterRating).toHaveBeenCalledWith(review);
       expect(await screen.findByText('pear')).toBeOnTheScreen();
       expect(screen.getByText('7장 남음')).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: '정답 확인' })).toBeOnTheScreen();
@@ -145,8 +145,8 @@ describe('복습 화면: 평가', () => {
   test('같은 카드가 다음 카드로 주입되어도 정답은 다시 닫혀 있다', async () => {
     const { store, deck } = await seed();
     const [apple] = await store.listCards(deck.id);
-    const advanceAfterRating = jest.fn().mockResolvedValue({ card: apple, remaining: 1 });
-    await renderApp(store, `/review/${deck.id}`, { advanceAfterRating });
+    const nextCardAfterRating = jest.fn().mockResolvedValue({ card: apple, remaining: 1 });
+    await renderApp(store, `/review/${deck.id}`, { nextCardAfterRating });
     const user = setupUser();
 
     await user.press(screen.getByRole('button', { name: '정답 확인' }));
@@ -184,7 +184,7 @@ describe('복습 화면: 복습 끝', () => {
       const past = await store.createCard(deck.id, { front: '이미 본 카드', back: '과거 정답' });
       await store.rateCard(past.id, { id: 'past-review', rating: 'know', hintUsed: false });
       // 재등장 순서나 종료 조건은 계산하지 않고 core의 응답만 대체한다.
-      const advanceAfterRating = jest
+      const nextCardAfterRating = jest
         .fn()
         .mockResolvedValueOnce({ card: pear, remaining: 3 })
         .mockResolvedValueOnce({ card: apple, remaining: 2 })
@@ -193,7 +193,7 @@ describe('복습 화면: 복습 끝', () => {
       await renderApp(
         store,
         `/review/${deck.id}`,
-        { advanceAfterRating, tomorrowCount: 42 },
+        { nextCardAfterRating, tomorrowCount: 42 },
         theme,
       );
       const user = setupUser();

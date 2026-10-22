@@ -39,7 +39,7 @@ export default function ReviewScreen(input: ReviewScreenInput = {}) {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       {first && queue.kind === 'ready' ? (
-        <ReviewSession
+        <ReviewFlow
           key={deckId}
           {...input}
           first={first}
@@ -65,22 +65,22 @@ export default function ReviewScreen(input: ReviewScreenInput = {}) {
   );
 }
 
-interface ReviewSessionProps extends ReviewScreenInput {
+interface ReviewFlowProps extends ReviewScreenInput {
   first: Card;
   initialRemaining: number;
   insetBottom: number;
 }
 
-function ReviewSession({
+function ReviewFlow({
   first,
   initialRemaining,
   insetBottom,
-  advanceAfterRating,
+  nextCardAfterRating,
   tomorrowCount,
-}: ReviewSessionProps) {
+}: ReviewFlowProps) {
   const store = useStore();
   const { colors, text } = useTheme();
-  const [session, setSession] = useState<{
+  const [progress, setProgress] = useState<{
     card: Card | null;
     remaining: number;
     ratings: Rating[];
@@ -91,7 +91,7 @@ function ReviewSession({
   const request = useRef<{ input: RateInput; review?: Review } | null>(null);
 
   const rate = async (rating: Rating) => {
-    if (!advanceAfterRating || !session.card || busy.current) return;
+    if (!nextCardAfterRating || !progress.card || busy.current) return;
     if (request.current && request.current.input.rating !== rating) return;
     busy.current = true;
     setSaving(true);
@@ -99,10 +99,10 @@ function ReviewSession({
     try {
       request.current ??= { input: { id: Crypto.randomUUID(), rating, hintUsed: false } };
       const attempt = request.current;
-      attempt.review ??= await store.rateCard(session.card.id, attempt.input);
-      const next = await advanceAfterRating(attempt.review);
+      attempt.review ??= await store.rateCard(progress.card.id, attempt.input);
+      const next = await nextCardAfterRating(attempt.review);
       const recordedRating = attempt.review.rating;
-      setSession((current) => ({ ...next, ratings: [...current.ratings, recordedRating] }));
+      setProgress((current) => ({ ...next, ratings: [...current.ratings, recordedRating] }));
       request.current = null;
       setPendingRating(null);
     } catch {
@@ -114,10 +114,10 @@ function ReviewSession({
     }
   };
 
-  if (!session.card) {
+  if (!progress.card) {
     return (
       <ReviewDone
-        ratings={session.ratings}
+        ratings={progress.ratings}
         tomorrowCount={tomorrowCount}
         insetBottom={insetBottom}
       />
@@ -129,16 +129,16 @@ function ReviewSession({
       <View style={styles.bar}>
         <IconButton icon={CloseIcon} label="복습 닫기" onPress={close} />
         <Text style={[text('caption'), styles.remaining, { color: colors.muted }]}>
-          {`${session.remaining}장 남음`}
+          {`${progress.remaining}장 남음`}
         </Text>
       </View>
       <ReviewCard
         // 같은 카드가 재등장해도 새 앞면으로 시작한다. 순서와 남은 수는 주입된 API의 결과만 쓴다.
-        key={session.ratings.length}
-        card={session.card}
+        key={progress.ratings.length}
+        card={progress.card}
         insetBottom={insetBottom}
         onRate={rate}
-        ratingDisabled={!advanceAfterRating || saving}
+        ratingDisabled={!nextCardAfterRating || saving}
         pendingRating={pendingRating}
       />
     </>
