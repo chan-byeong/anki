@@ -7,15 +7,15 @@ import type { Card } from '@/storage/store';
 
 // 대기열이 준비된 뒤의 복습. 카드를 하나씩 평가하고, 카드가 떨어지면 완료 화면을 보인다.
 interface ReviewFlowProps {
-  deckId: string;
+  deckIds: string[];
   cards: Card[];
   insetBottom: number;
 }
 
-export function ReviewFlow({ deckId, cards, insetBottom }: ReviewFlowProps) {
+export function ReviewFlow({ deckIds, cards, insetBottom }: ReviewFlowProps) {
   const { progress, saving, pendingRating, rate } = useReviewProgress(cards);
   // 복습이 끝났을 때 저장된 이력으로 센다.
-  const tomorrowCount = useTomorrowCount(deckId, !progress.card);
+  const tomorrowCount = useTomorrowCount(deckIds, !progress.card);
 
   if (!progress.card) {
     return (

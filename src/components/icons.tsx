@@ -4,6 +4,8 @@ import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 export interface IconProps {
   color: string;
   size?: number;
+  // 기본은 2. 작은 체크 표시처럼 캔버스가 선을 굵게 그린 곳에서만 쓴다.
+  strokeWidth?: number;
 }
 
 export type IconComponent = (props: IconProps) => React.JSX.Element;
@@ -14,7 +16,7 @@ function Glyph({
   size = 22,
   strokeWidth = 2,
   children,
-}: IconProps & { strokeWidth?: number; children: React.ReactNode }) {
+}: IconProps & { children: React.ReactNode }) {
   // 아이콘은 장식이다. 이름은 감싼 버튼의 접근성 라벨이 맡는다.
   // RN 전용 속성을 Svg에 주면 웹에서 <svg> DOM으로 새어 경고가 나므로 View에 aria-hidden을 준다.
   return (

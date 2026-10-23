@@ -2,7 +2,7 @@ import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore, type Rating } from '@/storage/store';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 
-import { countDueOn, countQueue, listQueue } from '../queue';
+import { countDueOn, countQueue, listQueue, listQueueOf } from '../queue';
 
 // 대기열은 Store가 읽어 주는 카드와 학습 이력에서 features/review가 만든다(ADR 0010).
 // 날짜는 Jest의 고정 TZ에서 시계를 해당 날의 정오로 옮겨 만든다(ADR 0013).
@@ -225,6 +225,44 @@ describe('삭제한 덱과 카드', () => {
   });
 });
 
+describe('listQueueOf', () => {
+  // 여러 덱을 고르면 대기열이 하나로 합쳐져 복습일이 오래된 카드부터 나온다.
+  test('선택한 덱들의 대기열을 하나로 합쳐 복습일이 오래된 카드부터 낸다', async () => {
+    const { store, deck: words, card: wordKnown, rate } = await openWithCard();
+    const dev = await store.createDeck({ name: '개발 지식' });
+    const devMissed = await store.createCard(dev.id, { front: 'git', back: '버전 관리' });
+    const devNew = await store.createCard(dev.id, { front: 'ci', back: '지속적 통합' });
+    await rate(wordKnown.id, 'know'); // 복습일 3일째
+    await rate(devMissed.id, 'dont'); // 복습일 1일째
+
+    const cards = await listQueueOf(store, [words.id, dev.id], FIRST_DAY + 5);
+
+    expect(cards.map(({ id }) => id)).toEqual([devMissed.id, wordKnown.id, devNew.id]);
+  });
+
+  test('선택하지 않은 덱의 카드와 아직 복습일이 아닌 카드는 나오지 않는다', async () => {
+    const { store, deck, card, rate } = await openWithCard();
+    const other = await store.createDeck({ name: '선택 안 함' });
+    await store.createCard(other.id, { front: 'git', back: '버전 관리' });
+    const later = await store.createCard(deck.id, { front: 'pear', back: '배' });
+    await rate(later.id, 'know');
+
+    const cards = await listQueueOf(store, [deck.id], FIRST_DAY);
+
+    expect(cards.map(({ id }) => id)).toEqual([card.id]);
+  });
+
+  test('선택한 덱 중 하나라도 없거나 휴지통에 있으면 거부한다', async () => {
+    const { store, deck } = await openWithCard();
+    const trashed = await store.createDeck({ name: '지운 덱' });
+    await store.trashDeck(trashed.id);
+
+    await expect(listQueueOf(store, [deck.id, trashed.id], FIRST_DAY)).rejects.toMatchObject({
+      code: 'trashed',
+    });
+  });
+});
+
 describe('countQueue', () => {
   test('살아 있는 덱마다 대기열에 나오는 카드 수를 센다', async () => {
     const { store, deck: words, card: missed, rate } = await openWithCard();
@@ -259,6 +297,16 @@ describe('countQueue', () => {
 });
 
 describe('countDueOn', () => {
+  test('여러 덱을 주면 덱마다 센 수를 더한다', async () => {
+    const { store, deck, card, rate } = await openWithCard();
+    const other = await store.createDeck({ name: '다른 덱' });
+    const elsewhere = await store.createCard(other.id, { front: 'pear', back: '배' });
+    await rate(card.id, 'dont');
+    await rate(elsewhere.id, 'dont');
+
+    expect(await countDueOn(store, [deck.id, other.id], FIRST_DAY + 1)).toBe(2);
+  });
+
   // 복습 끝 화면의 "내일 N장". 신규 카드와 밀린 카드는 세지 않는다.
   test('덱에서 복습일이 정확히 그날인 카드만 센다', async () => {
     const { store, deck, card: missed, rate } = await openWithCard();
