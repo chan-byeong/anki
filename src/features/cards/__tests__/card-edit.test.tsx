@@ -44,12 +44,17 @@ const setupUser = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTim
 const seed = async () => {
   const { store, port } = newStore();
   const deck = await store.createDeck({ name: '영어 단어' });
-  const card = await store.createCard(deck.id, { front: 'apple', back: '사과', memo: '과일' });
+  const card = await store.createCard(deck.id, {
+    front: 'apple',
+    back: '사과',
+    hint: '빨갛다',
+    memo: '과일',
+  });
   return { store, port, deck, card };
 };
 
 describe('카드 편집', () => {
-  test('덱 상세에서 카드를 누르면 앞면·뒷면·메모가 채워진 편집 화면이 열린다', async () => {
+  test('덱 상세에서 카드를 누르면 앞면·뒷면·힌트·메모가 채워진 편집 화면이 열린다', async () => {
     const { store, deck } = await seed();
     await renderApp(store, `/deck/${deck.id}`);
     const user = setupUser();
@@ -59,6 +64,7 @@ describe('카드 편집', () => {
     expect(screen.getByRole('header', { name: '카드 편집' })).toBeOnTheScreen();
     expect(screen.getByLabelText('앞면').props.value).toBe('apple');
     expect(screen.getByLabelText('뒷면').props.value).toBe('사과');
+    expect(screen.getByLabelText('힌트 (선택)').props.value).toBe('빨갛다');
     expect(screen.getByLabelText('메모 (선택)').props.value).toBe('과일');
     expect(screen.getByLabelText('덱: 영어 단어')).toBeOnTheScreen();
   });
@@ -93,6 +99,7 @@ describe('카드 편집', () => {
     const after = await port.cards.get(card.id);
     expect(after!.back_ts).toBeGreaterThan(before!.back_ts);
     expect(after!.front_ts).toBe(before!.front_ts);
+    expect(after!.hint_ts).toBe(before!.hint_ts);
     expect(after!.memo_ts).toBe(before!.memo_ts);
     expect(after!.image_ts).toBe(before!.image_ts);
   });
@@ -121,6 +128,19 @@ describe('카드 편집', () => {
     await screen.findByRole('button', { name: 'apple, 사과' });
 
     expect(await store.getCard(card.id)).toMatchObject({ memo: null });
+  });
+
+  test('힌트를 비우고 저장하면 힌트가 없는 카드가 되고 메모는 그대로다', async () => {
+    const { store, deck, card } = await seed();
+    await renderApp(store, `/deck/${deck.id}`);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: 'apple, 사과' }));
+    await user.clear(screen.getByLabelText('힌트 (선택)'));
+    await user.press(screen.getByRole('button', { name: '저장' }));
+    await screen.findByRole('button', { name: 'apple, 사과' });
+
+    expect(await store.getCard(card.id)).toMatchObject({ hint: null, memo: '과일' });
   });
 
   test.each(['앞면', '뒷면'])(

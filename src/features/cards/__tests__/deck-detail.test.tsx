@@ -141,22 +141,39 @@ describe('카드 추가', () => {
     expect(await screen.findByText('방금 추가 · apple')).toBeOnTheScreen();
     expect(screen.getByLabelText('앞면').props.value).toBe('');
     expect(await store.listCards(deck.id)).toMatchObject([
-      { front: 'apple', back: '사과', memo: null },
+      { front: 'apple', back: '사과', hint: null, memo: null },
     ]);
   });
 
-  test('메모가 공백뿐이면 비운 것으로 본다', async () => {
+  test('힌트와 메모를 적으면 각각의 칸으로 저장된다', async () => {
     const store = newStore();
     const deck = await store.createDeck({ name: '영어 단어' });
     const user = await openForm(store, deck.id);
 
     await user.type(screen.getByLabelText('앞면'), 'apple');
     await user.type(screen.getByLabelText('뒷면'), '사과');
+    await user.type(screen.getByLabelText('힌트 (선택)'), ' 빨갛다 ');
+    await user.type(screen.getByLabelText('메모 (선택)'), '과일');
+    await user.press(screen.getByRole('button', { name: '저장' }));
+
+    await screen.findByText('방금 추가 · apple');
+    expect(await store.listCards(deck.id)).toMatchObject([{ hint: '빨갛다', memo: '과일' }]);
+    expect(screen.getByLabelText('힌트 (선택)').props.value).toBe('');
+  });
+
+  test('힌트·메모가 공백뿐이면 비운 것으로 본다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    const user = await openForm(store, deck.id);
+
+    await user.type(screen.getByLabelText('앞면'), 'apple');
+    await user.type(screen.getByLabelText('뒷면'), '사과');
+    await user.type(screen.getByLabelText('힌트 (선택)'), '   ');
     await user.type(screen.getByLabelText('메모 (선택)'), '   ');
     await user.press(screen.getByRole('button', { name: '저장' }));
 
     await screen.findByText('방금 추가 · apple');
-    expect(await store.listCards(deck.id)).toMatchObject([{ memo: null }]);
+    expect(await store.listCards(deck.id)).toMatchObject([{ hint: null, memo: null }]);
   });
 
   test('앞면이나 뒷면이 비었거나 공백뿐이면 저장할 수 없다', async () => {

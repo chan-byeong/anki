@@ -12,6 +12,7 @@ const cardOf = (id: string): Card => ({
   deckId: 'deck-1',
   front: id,
   back: `${id}의 뒷면`,
+  hint: null,
   memo: null,
   image: null,
   createdAt: 0,

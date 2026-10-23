@@ -75,6 +75,7 @@ export const describeStoreContract = (
         const card = await store.createCard(deck.id, {
           front: 'apple',
           back: '사과',
+          hint: '빨갛다',
           memo: '과일',
         });
 
@@ -83,6 +84,7 @@ export const describeStoreContract = (
           deckId: deck.id,
           front: 'apple',
           back: '사과',
+          hint: '빨갛다',
           memo: '과일',
           image: null,
           createdAt: 2000,
@@ -98,12 +100,13 @@ export const describeStoreContract = (
         const card = await store.createCard(deck.id, {
           front: 'apple',
           back: '사과',
+          hint: '빨갛다',
           memo: '과일',
         });
 
-        const updated = await store.updateCard(card.id, { back: '애플', memo: null });
+        const updated = await store.updateCard(card.id, { back: '애플', hint: null });
 
-        expect(updated).toEqual({ ...card, back: '애플', memo: null });
+        expect(updated).toEqual({ ...card, back: '애플', hint: null });
         expect(await store.getCard(card.id)).toEqual(updated);
       });
 
@@ -118,10 +121,12 @@ export const describeStoreContract = (
 
         // front는 같은 값을 보내므로 바뀐 것이 아니다.
         await store.updateCard(card.id, { front: 'apple', back: '애플', memo: null });
+        await store.updateCard(card.id, { hint: '빨갛다' });
 
         expect(await port.cards.get(card.id)).toMatchObject({
           front_ts: 2000,
           back_ts: 3000,
+          hint_ts: 4000,
           memo_ts: 3000,
           image_ts: 2000,
         });

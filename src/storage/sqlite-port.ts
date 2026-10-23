@@ -35,6 +35,8 @@ const CARD_COLUMNS = columnsOf<CardRow>({
   deleted_at: true,
   deleted_ts: true,
   deleted_by_op: true,
+  hint: true,
+  hint_ts: true,
 });
 
 const REVIEW_COLUMNS = columnsOf<ReviewRow>({

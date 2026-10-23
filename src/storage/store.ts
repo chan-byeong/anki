@@ -24,6 +24,7 @@ export type Card = {
   deckId: string;
   front: string;
   back: string;
+  hint: string | null;
   memo: string | null;
   image: string | null;
   createdAt: number;
@@ -51,6 +52,7 @@ export type CreateDeckInput = { name: string; language?: string | null };
 export type CreateCardInput = {
   front: string;
   back: string;
+  hint?: string | null;
   memo?: string | null;
   image?: string | null;
 };
@@ -60,6 +62,7 @@ export type DeckPatch = { name?: string; language?: string | null };
 export type CardPatch = {
   front?: string;
   back?: string;
+  hint?: string | null;
   memo?: string | null;
   image?: string | null;
 };
@@ -160,6 +163,7 @@ const toCard = (row: CardRow): Card => ({
   deckId: row.deck_id,
   front: row.front,
   back: row.back,
+  hint: row.hint,
   memo: row.memo,
   image: row.image,
   createdAt: row.created_at,
@@ -343,11 +347,13 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
         deck_id: deckId,
         front: input.front,
         back: input.back,
+        hint: input.hint ?? null,
         memo: input.memo ?? null,
         image: input.image ?? null,
         created_at: now,
         front_ts: now,
         back_ts: now,
+        hint_ts: now,
         memo_ts: now,
         image_ts: now,
         ...aliveMark(now),
@@ -391,7 +397,7 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     requireText(patch.back, '뒷면');
     return port.transaction(async (tx) => {
       const row = await findAliveCard(tx, cardId);
-      const next = withChanges(row, patch, ['front', 'back', 'memo', 'image'], deps.now());
+      const next = withChanges(row, patch, ['front', 'back', 'hint', 'memo', 'image'], deps.now());
       if (next !== row) await tx.cards.put(next);
       return toCard(next);
     });

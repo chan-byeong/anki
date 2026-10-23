@@ -135,7 +135,7 @@ function EmptyCards() {
 }
 
 interface CardListProps {
-  cards: { id: string; front: string; back: string; memo: string | null }[];
+  cards: { id: string; front: string; back: string; hint: string | null; memo: string | null }[];
   query: string;
   onOpen: (cardId: string) => void;
 }
