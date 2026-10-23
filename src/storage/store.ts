@@ -137,14 +137,19 @@ export interface Store {
   restoreDeck(deckId: string): Promise<void>;
   /** 덱이 휴지통에 있으면 deck_trashed로 거부한다. 덱을 먼저 복구해야 한다. */
   restoreCard(cardId: string): Promise<void>;
-  /** 덱의 카드를 모두 지운 뒤 덱을 지우고, 지운 행마다 톰스톤을 남긴다(ADR 0014). */
+  /**
+   * 덱의 카드를 모두 지운 뒤 덱을 지우고, 지운 행마다 톰스톤을 남긴다(ADR 0014).
+   * 그 덱에서 먼저 따로 지운 카드도 함께 지워진다.
+   */
   deleteDeckPermanently(deckId: string): Promise<void>;
   /**
    * 학습 이력은 외래 키 CASCADE로 함께 지워진다.
-   * 덱이 휴지통에 있으면 deck_trashed로 거부한다. 덱과 함께 지운 카드를 따로 지우면 덱 복구 때 빠지기 때문이다.
-   * 따로 지운 카드는 덱이 휴지통에 있어도 listTrash에 나오지만, 덱을 복구한 뒤에 지울 수 있다(ADR 0018).
+   * 덱과 함께 지운 카드는 deck_trashed로 거부한다. 따로 지우면 덱 복구 때 빠지기 때문이다.
+   * 먼저 따로 지운 카드는 덱이 휴지통에 있어도 지울 수 있다(ADR 0018).
    */
   deleteCardPermanently(cardId: string): Promise<void>;
+  /** 휴지통의 덱(그 카드 전부)과 따로 지운 카드를 한 번에 영구 삭제한다. 지운 행마다 톰스톤을 남긴다. */
+  emptyTrash(): Promise<void>;
 
   // 복습
   /**
@@ -286,6 +291,28 @@ const findAliveCard = async (tx: PortTables, cardId: string): Promise<CardRow> =
   requireAlive(row);
   await requireDeckOfCardAlive(tx, row);
   return row;
+};
+
+// 덱과 같은 작업으로 지운 카드면 deck_trashed. 따로 지운 카드는 덱이 휴지통에 있어도 통과한다(ADR 0018).
+const requireNotTrashedWithDeck = async (tx: PortTables, card: CardRow): Promise<void> => {
+  const deck = await findDeck(tx, card.deck_id);
+  if (!isAlive(deck) && deck.deleted_by_op === card.deleted_by_op) {
+    throw new StoreError('deck_trashed', `카드(${card.id})는 덱과 함께 휴지통에 있다.`);
+  }
+};
+
+// 영구 삭제는 행을 지우고 톰스톤을 남긴다. 덱은 카드를 먼저 지워야 외래 키를 지킨다(ADR 0014).
+const removeCard = async (tx: PortTables, cardId: string): Promise<void> => {
+  await tx.cards.remove(cardId);
+  await tx.tombstones.put({ id: cardId, kind: 'card' });
+};
+
+const removeDeckWithCards = async (tx: PortTables, deckId: string): Promise<void> => {
+  for (const card of await tx.cards.listByDeck(deckId)) {
+    await removeCard(tx, card.id);
+  }
+  await tx.decks.remove(deckId);
+  await tx.tombstones.put({ id: deckId, kind: 'deck' });
 };
 
 // listTrashed가 살아 있는 행을 돌려줬다면 포트나 데이터가 깨진 것이므로 숨기지 않고 던진다.
@@ -483,12 +510,7 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   async deleteDeckPermanently(deckId) {
     await port.transaction(async (tx) => {
       requireTrashed(await findDeck(tx, deckId));
-      for (const card of await tx.cards.listByDeck(deckId)) {
-        await tx.cards.remove(card.id);
-        await tx.tombstones.put({ id: card.id, kind: 'card' });
-      }
-      await tx.decks.remove(deckId);
-      await tx.tombstones.put({ id: deckId, kind: 'deck' });
+      await removeDeckWithCards(tx, deckId);
     });
   },
 
@@ -496,9 +518,20 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     await port.transaction(async (tx) => {
       const row = await findCard(tx, cardId);
       requireTrashed(row);
-      await requireDeckOfCardAlive(tx, row);
-      await tx.cards.remove(cardId);
-      await tx.tombstones.put({ id: cardId, kind: 'card' });
+      await requireNotTrashedWithDeck(tx, row);
+      await removeCard(tx, cardId);
+    });
+  },
+
+  async emptyTrash() {
+    await port.transaction(async (tx) => {
+      for (const deck of await tx.decks.listTrashed()) {
+        await removeDeckWithCards(tx, deck.id);
+      }
+      // 덱을 지운 뒤 남은 휴지통 카드는 살아 있는 덱에서 따로 지운 것뿐이다.
+      for (const card of await tx.cards.listTrashed()) {
+        await removeCard(tx, card.id);
+      }
     });
   },
 
