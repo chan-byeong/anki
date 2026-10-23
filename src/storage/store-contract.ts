@@ -297,7 +297,8 @@ export const describeStoreContract = (
       });
 
       // 휴지통의 "카드 N장과 함께"는 덱과 같은 작업으로 지워진 카드의 수다. 따로 지운 카드는 세지 않는다.
-      test('덱은 함께 지워진 카드 수를 담고, 먼저 따로 지운 카드는 세지 않는다', async () => {
+      // 먼저 따로 지운 카드는 덱이 휴지통에 있어도 카드로 따로 나온다(ADR 0018).
+      test('덱은 함께 지워진 카드 수를 담고, 먼저 따로 지운 카드는 세지 않고 카드로 따로 나온다', async () => {
         const { store } = await harness.open();
         const deck = await store.createDeck({ name: '영어 단어' });
         const separate = await store.createCard(deck.id, { front: 'apple', back: '사과' });
@@ -314,7 +315,7 @@ export const describeStoreContract = (
           [deck.id]: 2,
           [empty.id]: 0,
         });
-        expect(cards).toEqual([]);
+        expect(cards.map(({ id }) => id)).toEqual([separate.id]);
       });
     });
 
@@ -333,8 +334,8 @@ export const describeStoreContract = (
 
         await store.trashDeck(deck.id);
 
-        // 덱 1 + 다른 덱에서 따로 지운 카드 1. 먼저 따로 지운 카드는 덱과 함께 다룬다.
-        expect(await store.countTrash()).toBe(2);
+        // 덱 1 + 따로 지운 카드 2. 덱과 함께 지운 카드는 세지 않고, 먼저 따로 지운 카드는 덱이 휴지통에 있어도 센다(ADR 0018).
+        expect(await store.countTrash()).toBe(3);
         expect(
           (await store.listTrash()).decks.length + (await store.listTrash()).cards.length,
         ).toBe(await store.countTrash());
@@ -373,6 +374,117 @@ export const describeStoreContract = (
         await expect(store.listReviewHistory(card.id)).rejects.toMatchObject({
           code: 'not_found',
         });
+      });
+
+      test('휴지통 목록에 나오지 않고, 덱을 복구하면 다시 보인다', async () => {
+        const { store, card } = await openWithStrandedCard();
+
+        expect((await store.listTrash()).cards).toEqual([]);
+        expect(await store.countTrash()).toBe(1);
+
+        await store.restoreDeck(card.deckId);
+
+        expect(await store.listCards(card.deckId)).toEqual([card]);
+      });
+    });
+
+    // 덱 복구는 덱과 같은 작업으로 지운 카드만 되살리고, 따로 지운 카드는 휴지통에 남긴다(ADR 0011, 0018).
+    describe('복구 시나리오', () => {
+      const ids = (items: { id: string }[]) => items.map(({ id }) => id);
+
+      test('카드를 먼저 따로 지우고 덱을 지우면, 덱을 복구해도 그 카드는 남고 따로 복구하면 원래 덱에 돌아온다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const separate = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const together = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.trashCard(separate.id);
+        await store.trashDeck(deck.id);
+        await expect(store.restoreCard(separate.id)).rejects.toMatchObject({
+          code: 'deck_trashed',
+        });
+
+        await store.restoreDeck(deck.id);
+
+        expect(ids(await store.listCards(deck.id))).toEqual([together.id]);
+        const trash = await store.listTrash();
+        expect(trash.decks).toEqual([]);
+        expect(ids(trash.cards)).toEqual([separate.id]);
+        expect(await store.countTrash()).toBe(1);
+
+        await store.restoreCard(separate.id);
+
+        expect(await store.listCards(deck.id)).toEqual([separate, together]);
+        expect(await store.countTrash()).toBe(0);
+      });
+
+      test('덱을 먼저 지우면 그 덱의 카드는 따로 지울 수 없고, 덱을 복구하면 함께 돌아온다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const apple = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.trashDeck(deck.id);
+
+        await expect(store.trashCard(apple.id)).rejects.toMatchObject({ code: 'trashed' });
+        expect((await store.listTrash()).cards).toEqual([]);
+
+        await store.restoreDeck(deck.id);
+
+        expect(await store.listCards(deck.id)).toEqual([apple, pear]);
+        expect(await store.countTrash()).toBe(0);
+      });
+
+      test('복구한 뒤 따로 지운 카드는 덱을 다시 지웠다 복구해도 휴지통에 남는다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const apple = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.trashDeck(deck.id);
+        await store.restoreDeck(deck.id);
+        await store.trashCard(apple.id);
+        await store.trashDeck(deck.id);
+
+        const trash = await store.listTrash();
+        expect(trash.decks.map(({ id, cardCount }) => [id, cardCount])).toEqual([[deck.id, 1]]);
+        expect(ids(trash.cards)).toEqual([apple.id]);
+
+        await store.restoreDeck(deck.id);
+
+        expect(await store.listCards(deck.id)).toEqual([pear]);
+        expect(ids((await store.listTrash()).cards)).toEqual([apple.id]);
+      });
+
+      test('이미 복구한 덱과 카드를 다시 복구하면 not_trashed로 거부한다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const card = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        await store.trashCard(card.id);
+        await store.restoreCard(card.id);
+
+        await expect(store.restoreCard(card.id)).rejects.toMatchObject({ code: 'not_trashed' });
+
+        await store.trashDeck(deck.id);
+        await store.restoreDeck(deck.id);
+
+        await expect(store.restoreDeck(deck.id)).rejects.toMatchObject({ code: 'not_trashed' });
+      });
+
+      test('카드를 따로 복구해도, 덱을 복구해도 학습 이력은 그대로다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const apple = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.rateCard(apple.id, { id: 'review-1', rating: 'dont', hintUsed: false });
+        await store.rateCard(apple.id, { id: 'review-2', rating: 'know', hintUsed: true });
+        await store.rateCard(pear.id, { id: 'review-3', rating: 'unsure', hintUsed: false });
+        const before = await store.listCardsWithHistory(deck.id);
+
+        await store.trashCard(apple.id);
+        await store.restoreCard(apple.id);
+        expect(await store.listCardsWithHistory(deck.id)).toEqual(before);
+
+        await store.trashDeck(deck.id);
+        await store.restoreDeck(deck.id);
+        expect(await store.listCardsWithHistory(deck.id)).toEqual(before);
       });
     });
 
