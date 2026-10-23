@@ -46,7 +46,7 @@ export type CardWithHistory = { card: Card; history: Review[] };
 export type Trash = {
   /** cardCount는 덱과 같은 작업으로 함께 삭제된 카드 수다. 먼저 따로 지운 카드는 세지 않는다. */
   decks: (Deck & { deletedAt: number; cardCount: number })[];
-  /** 따로 휴지통에 넣은 카드. 휴지통에 있는 덱의 카드는 덱과 함께 다룬다. */
+  /** 따로 휴지통에 넣은 카드. 덱이 휴지통에 있어도 나온다. 덱과 함께 지운 카드는 덱과 함께 다룬다(ADR 0018). */
   cards: (Card & { deletedAt: number })[];
 };
 
@@ -141,7 +141,8 @@ export interface Store {
   deleteDeckPermanently(deckId: string): Promise<void>;
   /**
    * 학습 이력은 외래 키 CASCADE로 함께 지워진다.
-   * 덱이 휴지통에 있으면 deck_trashed로 거부한다. 그 카드는 덱과 함께 다루므로(listTrash) 따로 지우면 덱 복구 때 빠진다.
+   * 덱이 휴지통에 있으면 deck_trashed로 거부한다. 덱과 함께 지운 카드를 따로 지우면 덱 복구 때 빠지기 때문이다.
+   * 따로 지운 카드는 덱이 휴지통에 있어도 listTrash에 나오지만, 덱을 복구한 뒤에 지울 수 있다(ADR 0018).
    */
   deleteCardPermanently(cardId: string): Promise<void>;
 
@@ -295,6 +296,16 @@ const toTrashed = <Row extends DeckRow | CardRow, Item>(row: Row, toItem: (row: 
   return { ...toItem(row), deletedAt: row.deleted_at };
 };
 
+// 휴지통의 카드 중 덱과 같은 작업으로 지워지지 않은 것. 덱이 휴지통에 있어도 먼저 따로 지운 카드는 남는다(ADR 0018).
+// 작업 ID는 작업마다 새로 만들므로 덱 ID를 함께 볼 필요가 없다.
+const listSeparatelyTrashedCards = async (
+  tx: PortTables,
+  trashedDecks: DeckRow[],
+): Promise<CardRow[]> => {
+  const deckOpIds = new Set(trashedDecks.map((deck) => deck.deleted_by_op));
+  return (await tx.cards.listTrashed()).filter((card) => !deckOpIds.has(card.deleted_by_op));
+};
+
 export const createStore = (port: Port, deps: StoreDeps): Store => ({
   // 덱
   async createDeck(input) {
@@ -424,16 +435,13 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   async listTrash() {
     return port.transaction(async (tx) => {
       const decks = await tx.decks.listTrashed();
-      const trashedDeckIds = new Set(decks.map((deck) => deck.id));
       const opIds = decks.flatMap((row) => (row.deleted_by_op === null ? [] : [row.deleted_by_op]));
       const counts = await tx.cards.countByDeleteOps(opIds);
       const trashedDecks = decks.map((row) => ({
         ...toTrashed(row, toDeck),
         cardCount: row.deleted_by_op === null ? 0 : (counts[row.deleted_by_op] ?? 0),
       }));
-      const cards = (await tx.cards.listTrashed()).filter(
-        (card) => !trashedDeckIds.has(card.deck_id),
-      );
+      const cards = await listSeparatelyTrashedCards(tx, decks);
       return {
         decks: trashedDecks,
         cards: cards.map((row) => toTrashed(row, toCard)),
@@ -444,10 +452,7 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   async countTrash() {
     return port.transaction(async (tx) => {
       const decks = await tx.decks.listTrashed();
-      const trashedDeckIds = new Set(decks.map((deck) => deck.id));
-      const cards = (await tx.cards.listTrashed()).filter(
-        (card) => !trashedDeckIds.has(card.deck_id),
-      );
+      const cards = await listSeparatelyTrashedCards(tx, decks);
       return decks.length + cards.length;
     });
   },

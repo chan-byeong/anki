@@ -199,13 +199,14 @@ export function Sheet({
           {actions.map((action, index) => {
             const ref = index === focusIndex ? firstActionRef : undefined;
             const hint = action.destructive ? DESTRUCTIVE_HINT : undefined;
+            // confirm의 주 동작은 primary, 되돌릴 수 없으면 danger, 취소는 ghost(캔버스 Settings-3, Trash-2, Trash-3).
             return confirm ? (
               <Button
                 key={`${index}-${action.label}`}
                 ref={ref}
                 label={action.label}
                 variant={
-                  action.destructive ? 'danger' : action.role === 'cancel' ? 'ghost' : 'secondary'
+                  action.destructive ? 'danger' : action.role === 'cancel' ? 'ghost' : 'primary'
                 }
                 accessibilityHint={hint}
                 onPress={() => press(action)}

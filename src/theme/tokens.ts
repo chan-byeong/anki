@@ -111,3 +111,6 @@ export const size = {
 // --status-bar, --safe-bottom은 기기 값이라 토큰으로 두지 않는다. safe-area insets를 쓴다.
 
 export const motion = 160;
+
+// 캔버스 Motion의 --toast-hold: 토스트가 머무는 시간. 보조 줄(sub)이 있으면 더 오래 둔다.
+export const toastHold = { plain: 3000, withSub: 4000 } as const;
