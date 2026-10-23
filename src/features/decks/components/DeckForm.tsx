@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CheckIcon, Field, Notice, TopBar } from '@/components';
 import { StoreError, type Deck } from '@/storage/store';
+import { saveFailureMessage } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
@@ -79,7 +80,7 @@ export function DeckForm({ deck }: { deck?: Deck }) {
   const [name, setName] = useState(deck?.name ?? '');
   const [language, setLanguage] = useState(deck?.language ?? null);
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const submitting = useRef(false);
   const active = useRef(true);
@@ -100,7 +101,7 @@ export function DeckForm({ deck }: { deck?: Deck }) {
     if (empty || submitting.current) return;
     submitting.current = true;
     setSaving(true);
-    setFailed(false);
+    setFailure(null);
     try {
       const input = { name: name.trim(), language };
       if (deck) await store.updateDeck(deck.id, input);
@@ -112,7 +113,7 @@ export function DeckForm({ deck }: { deck?: Deck }) {
       if (error instanceof StoreError && (error.code === 'not_found' || error.code === 'trashed')) {
         setMissing(true);
       } else {
-        setFailed(true);
+        setFailure(saveFailureMessage(error));
       }
       submitting.current = false;
       setSaving(false);
@@ -189,11 +190,11 @@ export function DeckForm({ deck }: { deck?: Deck }) {
           </Text>
         ) : null}
       </View>
-      {failed ? (
+      {failure ? (
         <Notice
           tone="danger"
           title={editing ? '덱을 저장하지 못했어요' : '덱을 만들지 못했어요'}
-          body="입력한 내용은 그대로예요. 잠시 뒤 다시 해 주세요."
+          body={failure}
         />
       ) : null}
     </DeckFormFrame>
