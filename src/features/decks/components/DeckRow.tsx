@@ -13,6 +13,8 @@ interface DeckRowProps {
   todayCount: number;
   onStartReview: () => void;
   onOpenDeck: () => void;
+  // 줄 끝 버튼이 여는 메뉴(덱 상세, 여러 덱 선택). 길게 누르기가 어려운 사용자의 진입 방법이다.
+  onOpenMenu: () => void;
   // 길게 눌러 선택 모드에 들어간다. 복습할 카드가 없는 덱에서는 쓰지 않는다.
   onEnterSelect?: () => void;
   // 선택 모드면 선택 여부(true/false)를, 아니면 undefined를 준다.
@@ -27,6 +29,7 @@ export function DeckRow({
   todayCount,
   onStartReview,
   onOpenDeck,
+  onOpenMenu,
   onEnterSelect,
   selected,
   onToggleSelect,
@@ -103,6 +106,13 @@ export function DeckRow({
         }
         onPress={done ? onOpenDeck : onStartReview}
         onLongPress={done ? undefined : onEnterSelect}
+        // 스크린 리더는 길게 누르기 대신 사용자 지정 동작으로 선택 모드에 들어간다.
+        accessibilityActions={
+          done || !onEnterSelect ? undefined : [{ name: 'select', label: '여러 덱 선택' }]
+        }
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'select') onEnterSelect?.();
+        }}
         style={({ pressed }) => [styles.main, { opacity: pressed ? 0.6 : 1 }]}
       >
         {done ? (
@@ -125,7 +135,7 @@ export function DeckRow({
         <View style={styles.spacer} />
       ) : (
         <View style={styles.trailing}>
-          <IconButton icon={MoreIcon} tone="muted" label={`${name} 덱 상세`} onPress={onOpenDeck} />
+          <IconButton icon={MoreIcon} tone="muted" label={`${name} 메뉴`} onPress={onOpenMenu} />
         </View>
       )}
     </View>
