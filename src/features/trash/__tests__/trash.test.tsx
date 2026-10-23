@@ -10,7 +10,7 @@ import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { toastHold } from '@/theme/tokens';
 
-// 휴지통에서 복구하는 흐름을 실제 라우터 위에서 메모리 Store로 돌린다(card-edit.test.tsx와 같은 방식).
+// 휴지통에서 복구하고 영구 삭제하는 흐름을 실제 라우터 위에서 메모리 Store로 돌린다(card-edit.test.tsx와 같은 방식).
 jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
@@ -127,5 +127,83 @@ describe('휴지통 복구', () => {
     });
 
     expect(screen.queryByText('카드를 복구했어요')).toBeNull();
+  });
+});
+
+describe('휴지통 영구 삭제', () => {
+  test('덱을 영구 삭제하면 확인 문구에 따로 지운 카드까지 센 수가 나오고, 덱과 카드가 모두 사라진다', async () => {
+    const { store } = await seed();
+    await renderTrash(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: /^덱 영어 단어,/ }));
+    await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+
+    expect(screen.getByRole('header', { name: '영구 삭제할까요?' })).toBeOnTheScreen();
+    expect(
+      screen.getByText('영어 단어 덱과 카드 2장, 그 학습 이력이 모두 사라져요. 되돌릴 수 없어요.'),
+    ).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+    await act(async () => {});
+
+    expect(screen.getByText('덱을 영구 삭제했어요')).toBeOnTheScreen();
+    expect(await store.listTrash()).toEqual({ decks: [], cards: [] });
+    expect(screen.getByText('휴지통이 비어 있어요')).toBeOnTheScreen();
+  });
+
+  test('확인에서 취소하면 지우지 않는다', async () => {
+    const { store } = await seed();
+    await renderTrash(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: /^apple,/ }));
+    await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+    await user.press(screen.getByRole('button', { name: '취소' }));
+    await act(async () => {});
+
+    expect((await store.listTrash()).cards).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'apple 복구' })).toBeOnTheScreen();
+  });
+
+  test('덱이 휴지통에 있어도 따로 지운 카드는 영구 삭제되고, 덱은 남는다', async () => {
+    const { store } = await seed();
+    await renderTrash(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: /^apple,/ }));
+    await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+
+    expect(
+      screen.getByText('apple 카드와 그 학습 이력이 모두 사라져요. 되돌릴 수 없어요.'),
+    ).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+    await act(async () => {});
+
+    expect(screen.getByText('카드를 영구 삭제했어요')).toBeOnTheScreen();
+    expect(await store.listTrash()).toMatchObject({ cards: [] });
+    expect(screen.queryByRole('button', { name: 'apple 복구' })).toBeNull();
+    expect(screen.getByText('덱 1')).toBeOnTheScreen();
+  });
+
+  test('휴지통을 비우면 덱과 카드가 모두 사라지고 비우기 버튼도 없어진다', async () => {
+    const { store } = await seed();
+    await renderTrash(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: '휴지통 비우기' }));
+
+    expect(
+      screen.getByText('덱 1개, 카드 2장과 그 학습 이력이 모두 사라져요. 되돌릴 수 없어요.'),
+    ).toBeOnTheScreen();
+
+    await user.press(screen.getAllByRole('button', { name: '휴지통 비우기' }).at(-1)!);
+    await act(async () => {});
+
+    expect(screen.getByText('휴지통을 비웠어요')).toBeOnTheScreen();
+    expect(await store.countTrash()).toBe(0);
+    expect(screen.getByText('휴지통이 비어 있어요')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: '휴지통 비우기' })).toBeNull();
   });
 });

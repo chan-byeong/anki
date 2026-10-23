@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, size, space } from '../theme/tokens';
-import { Button } from './Button';
+import { Button, type ButtonVariant } from './Button';
 import type { IconComponent } from './icons';
 
 export type SheetKind = 'menu' | 'confirm';
@@ -61,6 +61,11 @@ function moveFocus(target: View | Text): void {
     return;
   }
   AccessibilityInfo.sendAccessibilityEvent(target, 'focus');
+}
+
+function confirmVariant(action: SheetAction): ButtonVariant {
+  if (action.destructive) return 'danger';
+  return action.role === 'cancel' || action.danger ? 'ghost' : 'primary';
 }
 
 function devWarning(kind: SheetKind, actions: readonly SheetAction[]): string | null {
@@ -200,14 +205,14 @@ export function Sheet({
             const ref = index === focusIndex ? firstActionRef : undefined;
             const hint = action.destructive ? DESTRUCTIVE_HINT : undefined;
             // confirm의 주 동작은 primary, 되돌릴 수 없으면 danger, 취소는 ghost(캔버스 Settings-3, Trash-2, Trash-3).
+            // danger는 ghost에 글자만 danger 색이다(Trash-2의 "영구 삭제").
             return confirm ? (
               <Button
                 key={`${index}-${action.label}`}
                 ref={ref}
                 label={action.label}
-                variant={
-                  action.destructive ? 'danger' : action.role === 'cancel' ? 'ghost' : 'primary'
-                }
+                variant={confirmVariant(action)}
+                dangerText={!action.destructive && action.danger}
                 accessibilityHint={hint}
                 onPress={() => press(action)}
               />
