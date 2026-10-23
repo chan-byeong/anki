@@ -106,6 +106,15 @@ export const MemoIcon: IconComponent = (props) => (
   </Glyph>
 );
 
+// 캔버스에 힌트 아이콘이 없어 같은 격자의 물음표 원(help-circle)을 쓴다.
+export const HintIcon: IconComponent = (props) => (
+  <Glyph {...props}>
+    <Circle cx="12" cy="12" r="10" />
+    <Path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <Line x1="12" y1="17" x2="12.01" y2="17" />
+  </Glyph>
+);
+
 export const StatsIcon: IconComponent = (props) => (
   <Glyph {...props}>
     <Line x1="18" y1="20" x2="18" y2="10" />
