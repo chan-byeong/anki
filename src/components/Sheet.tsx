@@ -23,6 +23,10 @@ export interface SheetAction {
   onPress: () => void;
   // 되돌릴 수 없는 동작. 힌트로 알리고 danger 색으로 그린다.
   destructive?: boolean;
+  // 복구할 수 있지만 조심해야 하는 동작("덱 삭제"). danger 색으로만 그리고 되돌릴 수 없다고 알리지 않는다.
+  danger?: boolean;
+  // menu 항목 이름 아래 한 줄 설명. 접근성 힌트로도 읽힌다.
+  description?: string;
   // confirm의 취소 항목 표시. confirm에 없으면 개발 모드에서 경고한다(ADR 0008).
   role?: 'cancel';
   // menu 항목 앞의 아이콘.
@@ -234,15 +238,16 @@ interface SheetItemProps {
 // 캔버스 .sheet-item: 아이콘과 글자 한 줄, 두 번째 항목부터 위에 선과 행 높이.
 function SheetItem({ ref, action, hint, first, onPress }: SheetItemProps): React.JSX.Element {
   const { colors, text } = useTheme();
-  const color = action.destructive ? colors.danger : colors.text;
+  const color = action.destructive || action.danger ? colors.danger : colors.text;
   const Icon = action.icon;
+  const spokenHint = [action.description, hint].filter(Boolean).join('. ') || undefined;
 
   return (
     <Pressable
       ref={ref}
       accessibilityRole="button"
       accessibilityLabel={action.label}
-      accessibilityHint={hint}
+      accessibilityHint={spokenHint}
       onPress={onPress}
       style={({ pressed }) => [
         styles.item,
@@ -255,7 +260,12 @@ function SheetItem({ ref, action, hint, first, onPress }: SheetItemProps): React
           <Icon color={color} size={20} />
         </View>
       ) : null}
-      <Text style={[text('body'), { color }]}>{action.label}</Text>
+      <View style={styles.itemText}>
+        <Text style={[text('body'), { color }]}>{action.label}</Text>
+        {action.description ? (
+          <Text style={[text('caption'), { color: colors.muted }]}>{action.description}</Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -288,5 +298,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space[3],
   },
+  itemText: { flex: 1 },
   itemNext: { minHeight: size.row, borderTopWidth: 1 },
 });

@@ -3,22 +3,40 @@ import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, MoreIcon, Notice, PageHeader, PlusIcon, Sheet, TopBar } from '@/components';
+import {
+  Button,
+  EditIcon,
+  MoreIcon,
+  Notice,
+  PageHeader,
+  PlusIcon,
+  Sheet,
+  TopBar,
+  TrashIcon,
+} from '@/components';
 import { CardRow } from '@/features/cards/components/CardRow';
 import { CardSearchField } from '@/features/cards/components/CardSearchField';
 import { searchCards } from '@/features/cards/search-cards';
 import { useDeckCards } from '@/features/cards/use-deck-cards';
 import { useDeck } from '@/features/decks/use-deck';
+import { useTrashAction } from '@/features/trash/use-trash-action';
+import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
+import { goBack } from '@/utils/go-back';
 
-// 덱 상세(Deck-1, Deck-4). 검색과 나머지 메뉴 동작은 각각 STA-116, STA-131에서 더한다.
+// 덱 상세(Deck-1, Deck-2, Deck-4). 메뉴의 덱 삭제는 확인 없이 덱을 카드와 함께 휴지통으로 보낸다(복구할 수 있다).
 export default function DeckScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, retry } = useDeck(id);
   const cards = useDeckCards(id, state.kind === 'ready');
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const store = useStore();
+  const { trash: trashDeck, failed: trashFailed } = useTrashAction(
+    () => store.trashDeck(id),
+    () => goBack('/'),
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<View>(null);
   const [query, setQuery] = useState('');
@@ -40,7 +58,7 @@ export default function DeckScreen() {
       <TopBar
         leading="back"
         leadingLabel="덱 목록으로"
-        onLeadingPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onLeadingPress={() => goBack('/')}
         trailing={
           state.kind === 'ready'
             ? [
@@ -56,6 +74,11 @@ export default function DeckScreen() {
         }
       />
       <PageHeader title={state.kind === 'ready' ? state.deck.name : '덱 상세'} caption={caption} />
+      {trashFailed ? (
+        <View style={styles.notice}>
+          <Notice tone="danger" title="덱을 삭제하지 못했어요" body="잠시 뒤 다시 해 주세요." />
+        </View>
+      ) : null}
       {state.kind === 'failed' || state.kind === 'missing' ? (
         <View style={styles.notice}>
           <Notice
@@ -113,7 +136,18 @@ export default function DeckScreen() {
         actions={[
           {
             label: '덱 편집',
+            icon: EditIcon,
             onPress: () => router.push({ pathname: '/deck/[id]/edit', params: { id } }),
+          },
+          {
+            label: '덱 삭제',
+            icon: TrashIcon,
+            danger: true,
+            description:
+              cards.kind === 'ready'
+                ? `카드 ${cards.cards.length}장과 함께 휴지통으로 옮겨요. 복구할 수 있어요.`
+                : '카드와 함께 휴지통으로 옮겨요. 복구할 수 있어요.',
+            onPress: trashDeck,
           },
         ]}
       />

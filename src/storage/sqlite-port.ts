@@ -127,6 +127,17 @@ const tablesOn = (db: SqlExecutor): PortTables => ({
           [opId],
         ),
       ),
+    countByDeleteOps: async (opIds) => {
+      const counts: Record<string, number> = Object.fromEntries(opIds.map((opId) => [opId, 0]));
+      if (opIds.length === 0) return counts;
+      const marks = opIds.map(() => '?').join(', ');
+      const rows = await db.all<{ op: string; total: number }>(
+        `SELECT deleted_by_op AS op, COUNT(*) AS total FROM cards WHERE deleted_by_op IN (${marks}) GROUP BY deleted_by_op`,
+        opIds,
+      );
+      for (const row of rows) counts[row.op] = row.total;
+      return counts;
+    },
     remove: async (id) => {
       await db.run('DELETE FROM cards WHERE id = ?', [id]);
     },
