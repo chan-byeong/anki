@@ -15,7 +15,7 @@ interface UseReviewProgress {
   progress: ReviewProgress;
   saving: boolean;
   pendingRating: Rating | null;
-  rate: (rating: Rating) => Promise<void>;
+  rate: (rating: Rating, hintUsed: boolean) => Promise<void>;
 }
 
 // 한 번의 복습 진행 상태. 평가를 저장하고 다음 카드로 넘어가며, 지금까지의 평가를 모은다.
@@ -33,14 +33,14 @@ export function useReviewProgress(cards: Card[]): UseReviewProgress {
   const busy = useRef(false);
   const request = useRef<{ input: RateInput; review?: Review } | null>(null);
 
-  const rate = async (rating: Rating) => {
+  const rate = async (rating: Rating, hintUsed: boolean) => {
     if (!progress.card || busy.current) return;
     if (request.current && request.current.input.rating !== rating) return;
     busy.current = true;
     setSaving(true);
     setPendingRating(rating);
     try {
-      request.current ??= { input: { id: Crypto.randomUUID(), rating, hintUsed: false } };
+      request.current ??= { input: { id: Crypto.randomUUID(), rating, hintUsed } };
       const attempt = request.current;
       attempt.review ??= await store.rateCard(progress.card.id, attempt.input);
       const next = await nextCardAfterRating(attempt.review);
