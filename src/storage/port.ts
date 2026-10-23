@@ -41,6 +41,9 @@ export type CardRow = {
   deleted_ts: number;
   /** 함께 삭제된 행을 묶는 작업 ID. 삭제 표시가 없으면 null. */
   deleted_by_op: string | null;
+  /** 스키마 v2에서 더한 열. SQLite 열 순서와 맞추려고 끝에 둔다. */
+  hint: string | null;
+  hint_ts: number;
 };
 
 /** 학습 이력 한 건. 추가만 하는 데이터라 모든 필드가 바뀌지 않는다. */

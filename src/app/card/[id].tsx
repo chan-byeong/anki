@@ -57,6 +57,7 @@ function EditForm({ card }: EditFormProps) {
   const deckName = useDeckName(card.deckId);
   const [front, setFront] = useState(card.front);
   const [back, setBack] = useState(card.back);
+  const [hint, setHint] = useState(card.hint ?? '');
   const [memo, setMemo] = useState(card.memo ?? '');
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -72,6 +73,7 @@ function EditForm({ card }: EditFormProps) {
       await store.updateCard(card.id, {
         front: front.trim(),
         back: back.trim(),
+        hint: hint.trim() === '' ? null : hint.trim(),
         memo: memo.trim() === '' ? null : memo.trim(),
       });
       close();
@@ -101,6 +103,7 @@ function EditForm({ card }: EditFormProps) {
         ) : null}
         <Field label="앞면" size="title" first multiline value={front} onChangeText={setFront} />
         <Field label="뒷면" multiline value={back} onChangeText={setBack} />
+        <Field label="힌트" optional multiline value={hint} onChangeText={setHint} />
         <Field label="메모" optional multiline value={memo} onChangeText={setMemo} />
         {failed ? (
           <Notice tone="danger" title="카드를 저장하지 못했어요" body="잠시 뒤 다시 해 주세요." />

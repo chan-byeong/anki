@@ -61,4 +61,13 @@ const v1: Migration = async (tx) => {
   `);
 };
 
-export const migrations: Migration[] = [v1];
+// 힌트 필드(ADR 0017). 기존 카드의 수정 시각은 createCard처럼 카드를 만든 시각으로 채운다.
+const v2: Migration = async (tx) => {
+  await tx.exec(`
+    ALTER TABLE cards ADD COLUMN hint TEXT;
+    ALTER TABLE cards ADD COLUMN hint_ts INTEGER NOT NULL DEFAULT 0;
+    UPDATE cards SET hint_ts = created_at;
+  `);
+};
+
+export const migrations: Migration[] = [v1, v2];

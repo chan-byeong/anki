@@ -19,6 +19,7 @@ export default function NewCardScreen() {
   const deckName = useDeckName(deckId);
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
+  const [hint, setHint] = useState('');
   const [memo, setMemo] = useState('');
   const [added, setAdded] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -35,11 +36,13 @@ export default function NewCardScreen() {
       const card = await store.createCard(deckId, {
         front: front.trim(),
         back: back.trim(),
+        hint: hint.trim() === '' ? undefined : hint.trim(),
         memo: memo.trim() === '' ? undefined : memo.trim(),
       });
       setAdded(card.front);
       setFront('');
       setBack('');
+      setHint('');
       setMemo('');
       setFormKey((key) => key + 1);
     } catch {
@@ -99,12 +102,22 @@ export default function NewCardScreen() {
           value={back}
           onChangeText={setBack}
         />
+        {/* 캔버스(Card-1, Card-5)에는 힌트 칸이 없어 메모 칸과 같은 모양으로 둔다(ADR 0017). */}
+        <Field
+          key={`hint-${formKey}`}
+          label="힌트"
+          optional
+          multiline
+          placeholder="정답을 떠올릴 단서"
+          value={hint}
+          onChangeText={setHint}
+        />
         <Field
           key={`memo-${formKey}`}
           label="메모"
           optional
           multiline
-          placeholder="힌트, 예문"
+          placeholder="예문, 설명"
           value={memo}
           onChangeText={setMemo}
         />
