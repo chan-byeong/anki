@@ -1,20 +1,45 @@
+import { useState, type RefObject } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ListSection, Notice, PageHeader, TopBar } from '@/components';
+import { ListSection, Notice, PageHeader, Sheet, Toast, TopBar } from '@/components';
 import { formatDeletedAgo } from '@/features/trash/format-deleted-ago';
 import { TrashRow } from '@/features/trash/components/TrashRow';
+import { useRestore } from '@/features/trash/use-restore';
 import { useTrash } from '@/features/trash/use-trash';
+import type { Trash } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 import { goBack } from '@/utils/go-back';
 
-// 휴지통(Trash-1, Trash-4). 삭제한 덱과 카드를 보여 준다. 복구와 영구 삭제는 STA-132, STA-133에서 더한다.
+type TrashedDeck = Trash['decks'][number];
+
+// 덱 복구 전 안내(Trash-2). 함께 지운 카드만 돌아오고 따로 지운 카드는 남는다(ADR 0018).
+const deckRestoreBody = (cardCount: number): string =>
+  `${cardCount > 0 ? `덱과 함께 지운 카드 ${cardCount}장이 같이 돌아와요.` : '덱과 함께 지운 카드는 없어요.'} 덱을 지우기 전에 따로 지운 카드는 휴지통에 그대로 남아요.`;
+
+// 휴지통(Trash-1, Trash-2, Trash-4). 삭제한 덱과 카드를 보여 주고 복구한다. 영구 삭제는 STA-133에서 더한다.
+// 덱은 줄을 누르든 "복구"를 누르든 안내 시트를 거친다. 카드는 바로 복구한다.
 export default function TrashScreen() {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
-  const state = useTrash();
+  const { state, reload } = useTrash();
+  const { restoreDeck, restoreCard, toast, blocked, blockedOpen, dismissBlocked } =
+    useRestore(reload);
+  // 시트가 닫혀도 덱과 트리거를 남긴다. 내려가는 동안 문구가 비지 않고, 닫힐 때 트리거로 포커스를 돌려준다(ADR 0007).
+  const [deckSheet, setDeckSheet] = useState<{
+    deck: TrashedDeck;
+    trigger: RefObject<View | null>;
+  } | null>(null);
+  const [deckSheetOpen, setDeckSheetOpen] = useState(false);
+  // 안내 시트가 닫힌 뒤 포커스를 돌려줄 카드의 "복구" 버튼.
+  const [blockedTrigger, setBlockedTrigger] = useState<RefObject<View | null> | undefined>();
   const empty = state.kind === 'ready' && state.decks.length === 0 && state.cards.length === 0;
+
+  const openDeck = (deck: TrashedDeck) => (trigger: RefObject<View | null>) => {
+    setDeckSheet({ deck, trigger });
+    setDeckSheetOpen(true);
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
@@ -48,6 +73,8 @@ export default function TrashScreen() {
                   title={deck.name}
                   sub={`덱 · 카드 ${deck.cardCount}장과 함께 · ${formatDeletedAgo(deck.deletedAt, state.now)}`}
                   last={index === state.decks.length - 1}
+                  onOpen={openDeck(deck)}
+                  onRestore={openDeck(deck)}
                 />
               ))}
             </ListSection>
@@ -62,12 +89,48 @@ export default function TrashScreen() {
                     .filter((part) => part !== '')
                     .join(' · ')}
                   last={index === state.cards.length - 1}
+                  onRestore={(trigger) => {
+                    setBlockedTrigger(trigger);
+                    void restoreCard(card);
+                  }}
                 />
               ))}
             </ListSection>
           ) : null}
         </ScrollView>
       ) : null}
+      {toast ? <Toast message={toast.message} sub={toast.sub} /> : null}
+      <Sheet
+        visible={deckSheetOpen}
+        kind="confirm"
+        title={deckSheet?.deck.name}
+        body={deckSheet ? deckRestoreBody(deckSheet.deck.cardCount) : undefined}
+        triggerRef={deckSheet?.trigger}
+        onClose={() => setDeckSheetOpen(false)}
+        actions={[
+          {
+            label: '복구',
+            onPress: () => {
+              if (deckSheet) void restoreDeck(deckSheet.deck);
+            },
+          },
+          { label: '취소', role: 'cancel', onPress: () => {} },
+        ]}
+      />
+      {/* 덱이 휴지통에 있는 카드를 단독 복구하려 할 때의 안내. 캔버스에 없어 Trash-2 시트의 모양을 따른다. */}
+      <Sheet
+        visible={blockedOpen}
+        kind="confirm"
+        title="덱이 휴지통에 있어요"
+        body={
+          blocked
+            ? `이 카드를 복구하려면 먼저 ${blocked.deckName === '' ? '덱' : `${blocked.deckName} 덱`}을 복구해 주세요. 덱을 복구해도 따로 지운 이 카드는 휴지통에 남으니, 그다음에 복구하면 돼요.`
+            : undefined
+        }
+        triggerRef={blockedTrigger}
+        onClose={dismissBlocked}
+        actions={[{ label: '확인', role: 'cancel', onPress: () => {} }]}
+      />
     </View>
   );
 }
