@@ -19,7 +19,14 @@ export function ReviewBar({ remaining }: ReviewBarProps) {
     <View style={styles.bar}>
       <IconButton icon={CloseIcon} label="복습 닫기" onPress={close} />
       {remaining !== undefined ? (
-        <Text style={[text('caption'), styles.remaining, { color: colors.muted }]}>
+        // 숫자만 읽히지 않도록 이름을 붙이고, 줄어들면 라이브 영역으로 알린다(accessibilityLiveRegion은 Android 전용).
+        <Text
+          accessible
+          accessibilityLabel={`남은 카드 ${remaining}장`}
+          accessibilityLiveRegion="polite"
+          aria-live="polite"
+          style={[text('caption'), styles.remaining, { color: colors.muted }]}
+        >
           {`${remaining}장 남음`}
         </Text>
       ) : null}
