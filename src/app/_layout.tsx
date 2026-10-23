@@ -6,6 +6,7 @@ import {
 } from '@expo-google-fonts/noto-sans-kr';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import Storage from 'expo-sqlite/kv-store';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -71,7 +72,7 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <ThemeProvider>
+    <ThemeProvider storage={Storage}>
       {storeState.kind === 'open' ? (
         <StoreProvider store={storeState.store}>
           <ThemedStack />

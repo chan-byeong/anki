@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useColorScheme, type TextStyle } from 'react-native';
 
 import {
@@ -10,6 +10,12 @@ import {
   type ThemeName,
   type TypographyName,
 } from './tokens';
+import {
+  readThemePreference,
+  writeThemePreference,
+  type PreferenceStorage,
+  type ThemePreference,
+} from './theme-preference';
 
 interface TextStyleOptions {
   weight?: FontWeightName;
@@ -19,6 +25,9 @@ interface TextStyleOptions {
 
 interface Theme {
   name: ThemeName;
+  // 사용자가 고른 테마. system이면 name은 기기 설정을 따른다.
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
   colors: ColorTokens;
   // fontSize·lineHeight는 RN이 시스템 글자 크기에 맞춰 함께 키운다(allowFontScaling 기본값).
   text: (variant: TypographyName, options?: TextStyleOptions) => TextStyle;
@@ -27,18 +36,34 @@ interface Theme {
 const ThemeContext = createContext<Theme | null>(null);
 
 interface ThemeProviderProps {
-  // STA-134(테마 선택)에서 수동 선택을 넘길 자리. 비우면 시스템 설정을 따른다.
+  // 테스트에서 테마를 고정한다. 있으면 사용자의 선택보다 앞선다.
   override?: ThemeName;
+  // 테마 선택을 읽고 쓰는 곳. 없으면 저장하지 않고 시스템에서 시작한다.
+  storage?: PreferenceStorage;
   children: ReactNode;
 }
 
-export function ThemeProvider({ override, children }: ThemeProviderProps) {
+export function ThemeProvider({ override, storage, children }: ThemeProviderProps) {
   const system = useColorScheme();
-  const name: ThemeName = override ?? (system === 'dark' ? 'dark' : 'light');
+  const [preference, setPreferenceState] = useState<ThemePreference>(() =>
+    storage ? readThemePreference(storage) : 'system',
+  );
+  const setPreference = useCallback(
+    (next: ThemePreference) => {
+      setPreferenceState(next);
+      if (storage) void writeThemePreference(storage, next);
+    },
+    [storage],
+  );
+  const chosen: ThemeName =
+    preference === 'system' ? (system === 'dark' ? 'dark' : 'light') : preference;
+  const name: ThemeName = override ?? chosen;
 
   const theme = useMemo<Theme>(
     () => ({
       name,
+      preference,
+      setPreference,
       colors: colors[name],
       text: (variant, { weight = 'regular', ja = false } = {}) => {
         const { fontSize, lineHeight } = typography[variant];
@@ -50,7 +75,7 @@ export function ThemeProvider({ override, children }: ThemeProviderProps) {
         };
       },
     }),
-    [name],
+    [name, preference, setPreference],
   );
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
