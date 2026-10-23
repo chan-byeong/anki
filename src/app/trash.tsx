@@ -6,11 +6,12 @@ import { Button, ListSection, Notice, PageHeader, Sheet, Toast, TopBar } from '@
 import { formatDeletedAgo } from '@/features/trash/format-deleted-ago';
 import { TrashRow } from '@/features/trash/components/TrashRow';
 import { useTrash, type TrashedCard } from '@/features/trash/use-trash';
-import { useTrashActions } from '@/features/trash/use-trash-actions';
+import { useTrashActions, type TrashResult } from '@/features/trash/use-trash-actions';
 import type { Trash } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 import { goBack } from '@/utils/go-back';
+import { moveFocus } from '@/utils/move-focus';
 
 type TrashedDeck = Trash['decks'][number];
 type Target = { kind: 'deck'; deck: TrashedDeck } | { kind: 'card'; card: TrashedCard };
@@ -46,7 +47,7 @@ export default function TrashScreen() {
   const insets = useSafeAreaInsets();
   const { state, reload } = useTrash();
   const actions = useTrashActions(reload);
-  const { toast, blocked, blockedOpen, dismissBlocked } = actions;
+  const headingRef = useRef<Text>(null);
   // 시트가 닫혀도 대상과 트리거를 남긴다. 내려가는 동안 문구가 비지 않고, 닫힐 때 트리거로 포커스를 돌려준다(ADR 0007).
   const [item, setItem] = useState<{ target: Target; trigger: RefObject<View | null> } | null>(
     null,
@@ -56,12 +57,18 @@ export default function TrashScreen() {
   // 확인 문구는 열 때 정해 둔다. 지운 뒤 목록을 다시 읽어도 내려가는 시트의 숫자가 바뀌지 않는다.
   const [deleteText, setDeleteText] = useState('');
   const [emptyText, setEmptyText] = useState('');
-  // 영구 삭제 확인으로 넘어갈 때는 첫 시트가 포커스를 돌려주지 않는다. 확인 시트가 닫힐 때 돌려준다.
+  // 영구 삭제 확인으로 넘어갈 때는 첫 시트가 포커스를 돌려주지 않고, 다 닫힌 뒤 확인 시트를 연다.
+  // 확인 시트가 닫힐 때 포커스를 돌려준다.
   const [handingOff, setHandingOff] = useState(false);
   const [emptyOpen, setEmptyOpen] = useState(false);
   const emptyRef = useRef<View>(null);
-  // 안내 시트가 닫힌 뒤 포커스를 돌려줄 카드의 "복구" 버튼.
+  // 덱이 휴지통에 있어 복구하지 못한 카드. 안내를 닫아도 남겨서 내려가는 동안 문구가 비지 않게 한다.
+  const [blocked, setBlocked] = useState<TrashedCard | null>(null);
+  const [blockedOpen, setBlockedOpen] = useState(false);
+  // 안내 시트가 닫힌 뒤 포커스를 돌려줄, 카드를 복구하려고 누른 요소.
   const [blockedTrigger, setBlockedTrigger] = useState<RefObject<View | null> | undefined>();
+  // 시트가 완전히 닫히면 부른다. 한 번에 시트 하나만 열리므로 하나로 충분하다.
+  const sheetClosed = useRef<() => void>(() => {});
   const empty = state.kind === 'ready' && state.decks.length === 0 && state.cards.length === 0;
 
   const open = (target: Target) => (trigger: RefObject<View | null>) => {
@@ -70,13 +77,33 @@ export default function TrashScreen() {
     setItemOpen(true);
   };
 
-  const restore = (target: Target, trigger: RefObject<View | null>) => {
+  const untilClosed = () =>
+    new Promise<void>((resolve) => {
+      sheetClosed.current = resolve;
+    });
+
+  // 작업과 시트 닫힘을 모두 기다린다. 성공하면 누른 줄이나 버튼이 사라지므로 제목으로 포커스를 보낸다(ADR 0007).
+  // 복구하지 못한 카드의 안내도 시트가 다 닫힌 뒤 연다. iOS는 닫히는 Modal 위에 Modal을 띄우지 못할 수 있다.
+  const settle = async (
+    result: Promise<TrashResult>,
+    closed: Promise<void>,
+    card?: TrashedCard,
+  ) => {
+    const [outcome] = await Promise.all([result, closed]);
+    if (outcome === 'done' && headingRef.current) moveFocus(headingRef.current);
+    if (outcome === 'blocked' && card) {
+      setBlocked(card);
+      setBlockedOpen(true);
+    }
+  };
+
+  const restore = (target: Target, trigger: RefObject<View | null>, closed: Promise<void>) => {
     if (target.kind === 'deck') {
-      void actions.restoreDeck(target.deck);
+      void settle(actions.restoreDeck(target.deck), closed);
       return;
     }
     setBlockedTrigger(trigger);
-    void actions.restoreCard(target.card);
+    void settle(actions.restoreCard(target.card), closed, target.card);
   };
 
   const separateCards = (target: Target): number =>
@@ -87,7 +114,11 @@ export default function TrashScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <TopBar leading="back" leadingLabel="설정으로" onLeadingPress={() => goBack('/settings')} />
-      <PageHeader title="휴지통" caption="자동으로 비워지지 않아요. 복구하거나 직접 지워 주세요." />
+      <PageHeader
+        ref={headingRef}
+        title="휴지통"
+        caption="자동으로 비워지지 않아요. 복구하거나 직접 지워 주세요."
+      />
       {state.kind === 'failed' ? (
         <View style={styles.notice}>
           <Notice
@@ -133,7 +164,9 @@ export default function TrashScreen() {
                     .join(' · ')}
                   last={index === state.cards.length - 1}
                   onOpen={open({ kind: 'card', card })}
-                  onRestore={(trigger) => restore({ kind: 'card', card }, trigger)}
+                  onRestore={(trigger) =>
+                    restore({ kind: 'card', card }, trigger, Promise.resolve())
+                  }
                 />
               ))}
             </ListSection>
@@ -159,7 +192,7 @@ export default function TrashScreen() {
           />
         </View>
       ) : null}
-      {toast ? <Toast message={toast.message} sub={toast.sub} /> : null}
+      {actions.toast ? <Toast message={actions.toast.message} sub={actions.toast.sub} /> : null}
       {/* 덱은 Trash-2. 카드는 캔버스에 없어 같은 모양에 앞면과 뒷면, 덱 이름을 보인다. */}
       <Sheet
         visible={itemOpen}
@@ -182,11 +215,15 @@ export default function TrashScreen() {
         }
         triggerRef={handingOff ? undefined : item?.trigger}
         onClose={() => setItemOpen(false)}
+        onClosed={() => {
+          sheetClosed.current();
+          if (handingOff) setDeleteOpen(true);
+        }}
         actions={[
           {
             label: '복구',
             onPress: () => {
-              if (item) restore(item.target, item.trigger);
+              if (item) restore(item.target, item.trigger, untilClosed());
             },
           },
           {
@@ -196,7 +233,6 @@ export default function TrashScreen() {
               if (!item) return;
               setDeleteText(deleteBody(item.target, separateCards(item.target)));
               setHandingOff(true);
-              setDeleteOpen(true);
             },
           },
           { label: '취소', role: 'cancel', onPress: () => {} },
@@ -209,14 +245,19 @@ export default function TrashScreen() {
         body={deleteText}
         triggerRef={item?.trigger}
         onClose={() => setDeleteOpen(false)}
+        onClosed={() => sheetClosed.current()}
         actions={[
           {
             label: '영구 삭제',
             destructive: true,
             onPress: () => {
               if (!item) return;
-              if (item.target.kind === 'deck') void actions.deleteDeck(item.target.deck);
-              else void actions.deleteCard(item.target.card);
+              void settle(
+                item.target.kind === 'deck'
+                  ? actions.deleteDeck(item.target.deck)
+                  : actions.deleteCard(item.target.card),
+                untilClosed(),
+              );
             },
           },
           { label: '취소', role: 'cancel', onPress: () => {} },
@@ -229,8 +270,13 @@ export default function TrashScreen() {
         body={emptyText}
         triggerRef={emptyRef}
         onClose={() => setEmptyOpen(false)}
+        onClosed={() => sheetClosed.current()}
         actions={[
-          { label: '휴지통 비우기', destructive: true, onPress: () => void actions.emptyTrash() },
+          {
+            label: '휴지통 비우기',
+            destructive: true,
+            onPress: () => void settle(actions.emptyTrash(), untilClosed()),
+          },
           { label: '취소', role: 'cancel', onPress: () => {} },
         ]}
       />
@@ -245,7 +291,7 @@ export default function TrashScreen() {
             : undefined
         }
         triggerRef={blockedTrigger}
-        onClose={dismissBlocked}
+        onClose={() => setBlockedOpen(false)}
         actions={[{ label: '확인', role: 'cancel', onPress: () => {} }]}
       />
     </View>

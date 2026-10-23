@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { userEvent } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import TrashScreen from '@/app/trash';
@@ -15,6 +16,41 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
+
+// iOS Modal은 닫힘 애니메이션이 끝나야 사라지고 onDismiss를 부르는데, 테스트에는 네이티브가 없다.
+// 닫히면 그리지 않고 MOCK_DISMISS_MS 뒤에 onDismiss를 불러 그 순서를 흉내 낸다. 다른 Modal이 닫히는 중에
+// 새 Modal이 열리면 기록한다. iOS는 이때 새 Modal을 띄우지 못할 수 있다(ADR 0007).
+const MOCK_DISMISS_MS = 300;
+const mockModal = { dismissing: 0, overlapped: false };
+jest.mock('react-native/Libraries/Modal/Modal', () => {
+  const React = jest.requireActual('react');
+  const Actual = jest.requireActual('react-native/Libraries/Modal/Modal');
+  const RealModal = Actual.default ?? Actual;
+  const DismissingModal = (props: { visible?: boolean; onDismiss?: () => void }) => {
+    const wasVisible = React.useRef(props.visible);
+    React.useEffect(() => {
+      if (props.visible && !wasVisible.current && mockModal.dismissing > 0) {
+        mockModal.overlapped = true;
+      }
+      if (wasVisible.current && !props.visible) {
+        mockModal.dismissing += 1;
+        setTimeout(() => {
+          mockModal.dismissing -= 1;
+          props.onDismiss?.();
+        }, MOCK_DISMISS_MS);
+      }
+      wasVisible.current = props.visible;
+    });
+    return props.visible ? React.createElement(RealModal, props) : null;
+  };
+  return { __esModule: true, default: DismissingModal };
+});
+
+// 시트가 다 닫히기를 기다린다.
+const finishDismiss = () =>
+  act(async () => {
+    jest.advanceTimersByTime(MOCK_DISMISS_MS);
+  });
 
 const newStore = (): Store =>
   createStore(createMemoryPort(createMemoryBacking()), {
@@ -47,8 +83,25 @@ const seed = async () => {
   return { store, deck, apple, pear };
 };
 
-beforeEach(() => jest.useFakeTimers());
-afterEach(() => jest.useRealTimers());
+let sendEvent: jest.SpyInstance;
+
+// sendAccessibilityEvent가 받는 ref는 컴포넌트 인스턴스라 RNTL 요소와 같은 객체가 아니어서, 글자로 식별한다.
+const lastFocused = (): unknown => {
+  const target = sendEvent.mock.calls.at(-1)?.[0] as { props: { children?: unknown } } | undefined;
+  return target?.props.children;
+};
+
+beforeEach(() => {
+  mockModal.dismissing = 0;
+  mockModal.overlapped = false;
+  jest.useFakeTimers();
+  sendEvent = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation();
+});
+afterEach(() => {
+  expect(mockModal.overlapped).toBe(false);
+  jest.useRealTimers();
+  sendEvent.mockRestore();
+});
 
 describe('휴지통 복구', () => {
   test('덱이 휴지통에 있어도 따로 지운 카드가 덱 이름과 함께 보인다', async () => {
@@ -75,9 +128,10 @@ describe('휴지통 복구', () => {
     expect(await store.getDeck(deck.id)).toBeNull();
 
     await user.press(screen.getByRole('button', { name: '복구' }));
-    await act(async () => {});
+    await finishDismiss();
 
     expect(screen.getByText('덱을 복구했어요')).toBeOnTheScreen();
+    expect(lastFocused()).toBe('휴지통');
     expect(await store.listCards(deck.id)).toEqual([pear]);
     expect(screen.queryByText('덱 1')).toBeNull();
     expect(screen.getByRole('button', { name: 'apple 복구' })).toBeOnTheScreen();
@@ -90,7 +144,7 @@ describe('휴지통 복구', () => {
 
     await user.press(screen.getByRole('button', { name: /^덱 영어 단어,/ }));
     await user.press(screen.getByRole('button', { name: '취소' }));
-    await act(async () => {});
+    await finishDismiss();
 
     expect(await store.getDeck(deck.id)).toBeNull();
     expect(screen.getByText('덱 1')).toBeOnTheScreen();
@@ -109,6 +163,22 @@ describe('휴지통 복구', () => {
     expect(await store.getCard(apple.id)).toBeNull();
   });
 
+  test('카드 시트에서 복구하다 막히면 시트가 다 닫힌 뒤 안내를 연다', async () => {
+    const { store } = await seed();
+    await renderTrash(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: /^apple,/ }));
+    await user.press(screen.getByRole('button', { name: '복구' }));
+    await act(async () => {});
+
+    expect(screen.queryByRole('header', { name: '덱이 휴지통에 있어요' })).toBeNull();
+
+    await finishDismiss();
+
+    expect(screen.getByRole('header', { name: '덱이 휴지통에 있어요' })).toBeOnTheScreen();
+  });
+
   test('카드는 바로 복구되고, 토스트는 잠시 뒤 사라진다', async () => {
     const { store, deck, apple, pear } = await seed();
     await store.restoreDeck(deck.id);
@@ -119,6 +189,7 @@ describe('휴지통 복구', () => {
     await act(async () => {});
 
     expect(screen.getByText('카드를 복구했어요')).toBeOnTheScreen();
+    expect(lastFocused()).toBe('휴지통');
     expect(await store.listCards(deck.id)).toEqual([apple, pear]);
     expect(screen.getByText('휴지통이 비어 있어요')).toBeOnTheScreen();
 
@@ -138,6 +209,7 @@ describe('휴지통 영구 삭제', () => {
 
     await user.press(screen.getByRole('button', { name: /^덱 영어 단어,/ }));
     await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+    await finishDismiss();
 
     expect(screen.getByRole('header', { name: '영구 삭제할까요?' })).toBeOnTheScreen();
     expect(
@@ -145,9 +217,10 @@ describe('휴지통 영구 삭제', () => {
     ).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: '영구 삭제' }));
-    await act(async () => {});
+    await finishDismiss();
 
     expect(screen.getByText('덱을 영구 삭제했어요')).toBeOnTheScreen();
+    expect(lastFocused()).toBe('휴지통');
     expect(await store.listTrash()).toEqual({ decks: [], cards: [] });
     expect(screen.getByText('휴지통이 비어 있어요')).toBeOnTheScreen();
   });
@@ -159,10 +232,12 @@ describe('휴지통 영구 삭제', () => {
 
     await user.press(screen.getByRole('button', { name: /^apple,/ }));
     await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+    await finishDismiss();
     await user.press(screen.getByRole('button', { name: '취소' }));
-    await act(async () => {});
+    await finishDismiss();
 
     expect((await store.listTrash()).cards).toHaveLength(1);
+    expect(lastFocused()).not.toBe('휴지통');
     expect(screen.getByRole('button', { name: 'apple 복구' })).toBeOnTheScreen();
   });
 
@@ -173,13 +248,14 @@ describe('휴지통 영구 삭제', () => {
 
     await user.press(screen.getByRole('button', { name: /^apple,/ }));
     await user.press(screen.getByRole('button', { name: '영구 삭제' }));
+    await finishDismiss();
 
     expect(
       screen.getByText('apple 카드와 그 학습 이력이 모두 사라져요. 되돌릴 수 없어요.'),
     ).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: '영구 삭제' }));
-    await act(async () => {});
+    await finishDismiss();
 
     expect(screen.getByText('카드를 영구 삭제했어요')).toBeOnTheScreen();
     expect(await store.listTrash()).toMatchObject({ cards: [] });
@@ -199,9 +275,10 @@ describe('휴지통 영구 삭제', () => {
     ).toBeOnTheScreen();
 
     await user.press(screen.getAllByRole('button', { name: '휴지통 비우기' }).at(-1)!);
-    await act(async () => {});
+    await finishDismiss();
 
     expect(screen.getByText('휴지통을 비웠어요')).toBeOnTheScreen();
+    expect(lastFocused()).toBe('휴지통');
     expect(await store.countTrash()).toBe(0);
     expect(screen.getByText('휴지통이 비어 있어요')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: '휴지통 비우기' })).toBeNull();
