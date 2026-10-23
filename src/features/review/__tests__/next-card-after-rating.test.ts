@@ -45,7 +45,7 @@ describe('createNextCardAfterRating', () => {
     expect(await nextCardAfterRating(review)).toEqual({ card: banana, remaining: 2 });
   });
 
-  // 재등장 위치는 STA-122가 바꾸기 전까지 임시로 맨 뒤다. 남은 카드는 대기열에서 빠질 때만 준다.
+  // 남은 다른 카드가 3장 미만이면 재등장은 맨 뒤다. 남은 카드는 대기열에서 빠질 때만 준다.
   test('모름으로 평가하면 남은 카드는 그대로이고 그 카드는 맨 뒤에서 다시 나온다', async () => {
     const { store, cards, rate } = await openWithCards(['apple', 'banana', 'cherry']);
     const [apple, banana, cherry] = cards;
@@ -63,6 +63,50 @@ describe('createNextCardAfterRating', () => {
       card: apple,
       remaining: 1,
     });
+  });
+
+  test('모름·헷갈림 카드는 다른 카드 3~10장 뒤에 다시 나온다', async () => {
+    const fronts = Array.from({ length: 14 }, (_, index) => `word${index}`);
+    const { store, cards, rate } = await openWithCards(fronts);
+    const nextCardAfterRating = createNextCardAfterRating(store, cards, () => 0);
+
+    await nextCardAfterRating(await rate(cards[0].id, 'unsure'));
+    const shown: string[] = [];
+    let current: Card | null = cards[1];
+    while (current !== null && current.id !== cards[0].id) {
+      shown.push(current.id);
+      current = (await nextCardAfterRating(await rate(current.id, 'know'))).card;
+    }
+
+    expect(shown).toEqual(cards.slice(1, 4).map(({ id }) => id));
+  });
+
+  test('한 카드는 최초 노출을 포함해 3회를 넘기지 않는다', async () => {
+    const { store, cards, rate } = await openWithCards(['a', 'b', 'c', 'd', 'e', 'f']);
+    const nextCardAfterRating = createNextCardAfterRating(store, cards, () => 0);
+    const exposures = new Map<string, number>();
+
+    let current: Card | null = cards[0];
+    while (current !== null) {
+      exposures.set(current.id, (exposures.get(current.id) ?? 0) + 1);
+      current = (await nextCardAfterRating(await rate(current.id, 'dont'))).card;
+    }
+
+    expect([...exposures.values()]).toEqual([3, 3, 3, 3, 3, 3]);
+  });
+
+  test('앎으로 평가한 카드는 다시 나오지 않는다', async () => {
+    const { store, cards, rate } = await openWithCards(['a', 'b', 'c', 'd', 'e']);
+    const nextCardAfterRating = createNextCardAfterRating(store, cards, () => 0);
+    const seen: string[] = [];
+
+    let current: Card | null = cards[0];
+    while (current !== null) {
+      seen.push(current.id);
+      current = (await nextCardAfterRating(await rate(current.id, 'know'))).card;
+    }
+
+    expect(seen).toEqual(cards.map(({ id }) => id));
   });
 
   // 평가는 화면에 보인 카드, 곧 대기열의 맨 앞 카드에만 들어온다. 다른 카드면 대기열을 건드리지 않고 던진다.
