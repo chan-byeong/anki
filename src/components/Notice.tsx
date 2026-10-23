@@ -5,6 +5,7 @@ import { radius, size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { A11yLabelProps, A11yLiveProps, A11yRoleProps, InheritedA11yProps } from './a11y';
 import { AlertCircleIcon, type IconComponent } from './icons';
+import { LiveAnnouncer } from './LiveAnnouncer';
 
 export type NoticeTone = 'info' | 'warn' | 'danger';
 
@@ -34,7 +35,7 @@ export function Notice({
 }: NoticeProps) {
   const { colors, text } = useTheme();
   const spoken = body ? `${title}. ${body}` : title;
-  // 오류는 나타나는 즉시 읽어 준다. accessibilityLiveRegion은 Android 전용이다.
+  // 오류는 나타나는 즉시 읽어 준다. accessibilityLiveRegion은 Android 전용이라 웹은 LiveAnnouncer가 읽는다.
   useEffect(() => {
     if (tone === 'danger') AccessibilityInfo.announceForAccessibility(spoken);
   }, [tone, spoken]);
@@ -49,6 +50,7 @@ export function Notice({
           : { backgroundColor: colors.surface, borderRadius: radius.sm, padding: space[3] },
       ]}
     >
+      {tone === 'danger' ? <LiveAnnouncer assertive message={spoken} /> : null}
       <View aria-hidden style={styles.icon}>
         <Icon color={iconColor} size={18} />
       </View>

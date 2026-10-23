@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { IconComponent } from './icons';
+import { LiveAnnouncer } from './LiveAnnouncer';
 
 interface ToastProps {
   message: string;
@@ -19,7 +20,7 @@ export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
   const spoken = sub ? `${message}. ${sub}` : message;
-  // accessibilityLiveRegion은 Android 전용이라 iOS는 직접 읽어 준다.
+  // accessibilityLiveRegion은 Android 전용이라 iOS는 직접 읽어 주고, 웹은 LiveAnnouncer가 읽는다.
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(spoken);
   }, [spoken]);
@@ -37,6 +38,7 @@ export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps
       accessibilityLabel={spoken}
       style={[styles.toast, { backgroundColor: colors.text, bottom }]}
     >
+      <LiveAnnouncer message={spoken} />
       {Icon ? (
         <View aria-hidden>
           <Icon color={colors.inverse} size={18} />
