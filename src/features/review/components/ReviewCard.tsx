@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { IconButton, MemoIcon } from '@/components';
+import { HintIcon, IconButton, MemoIcon } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import { RatingButtons } from '@/features/review/components/RatingButtons';
 import type { Card, Rating } from '@/storage/store';
@@ -27,13 +27,16 @@ export function ReviewCard({
   const { colors, text } = useTheme();
   const deckName = useDeckName(card.deckId);
   const [revealed, setRevealed] = useState(false);
-  // 메모를 한 번이라도 열면 힌트로 기록된다. 다시 닫아도 기록은 남는다.
+  // 정답을 열기 전에 힌트를 열면 힌트를 쓴 것으로 기록되고, 다시 닫아도 남는다.
+  // 메모는 언제 열어도 기록하지 않는다(ADR 0017).
+  const [hintOpen, setHintOpen] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
+  const hintShown = card.hint !== null && hintOpen;
   const memoShown = card.memo !== null && memoOpen;
-  // 캔버스(Review-1): 메모를 닫고 정답을 열기 전에는 아이콘 줄이 카드 위에 떠 있어 앞면이 카드 전체의 가운데에 온다.
-  // 메모를 열거나 정답을 열면 흐름 안에 놓인다(Review-2, Review-3).
-  const memoFloats = !revealed && !memoShown;
+  // 캔버스(Review-1): 펼친 칸이 없고 정답을 열기 전에는 아이콘 줄이 카드 위에 떠 있어 앞면이 카드 전체의 가운데에 온다.
+  // 칸을 펼치거나 정답을 열면 흐름 안에 놓인다(Review-2, Review-3).
+  const extrasFloat = !revealed && !hintShown && !memoShown;
   const frontId = `review-front-${card.id}`;
 
   const reveal = () => {
@@ -42,9 +45,9 @@ export function ReviewCard({
     AccessibilityInfo.announceForAccessibility(`정답이 열렸어요. ${card.back}`);
   };
 
-  const toggleMemo = () => {
-    setMemoOpen((open) => !open);
-    setHintUsed(true);
+  const toggleHint = () => {
+    setHintOpen((open) => !open);
+    if (!revealed) setHintUsed(true);
   };
 
   return (
@@ -94,30 +97,56 @@ export function ReviewCard({
               </View>
             </ScrollView>
           </Pressable>
-          {card.memo !== null ? (
+          {card.hint !== null || card.memo !== null ? (
             <View
-              style={[styles.memoArea, memoFloats ? styles.memoFloating : null]}
+              style={[styles.extras, extrasFloat ? styles.extrasFloating : null]}
               pointerEvents="box-none"
             >
+              {/* 캔버스에는 메모 칸(Review-2)만 있어 힌트 칸도 같은 모양으로 둔다. */}
+              {hintShown ? (
+                <View
+                  role="region"
+                  accessibilityLabel="힌트"
+                  style={[styles.panel, { backgroundColor: colors.bg }]}
+                >
+                  <Text style={text('body')}>{card.hint}</Text>
+                  {hintUsed ? (
+                    <Text style={[text('caption'), { color: colors.muted }]}>
+                      힌트로 기록됩니다
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
               {memoShown ? (
                 <View
                   role="region"
                   accessibilityLabel="메모"
-                  style={[styles.memo, { backgroundColor: colors.bg }]}
+                  style={[styles.panel, { backgroundColor: colors.bg }]}
                 >
                   <Text style={text('body')}>{card.memo}</Text>
-                  <Text style={[text('caption'), { color: colors.muted }]}>힌트로 기록됩니다</Text>
                 </View>
               ) : null}
-              <View style={styles.memoButton}>
-                <IconButton
-                  icon={MemoIcon}
-                  tone="muted"
-                  label={memoShown ? '메모 닫기' : '메모 열기'}
-                  pressed={memoShown}
-                  disabled={pendingRating !== null}
-                  onPress={toggleMemo}
-                />
+              <View style={styles.extraButtons}>
+                {card.hint !== null ? (
+                  <IconButton
+                    icon={HintIcon}
+                    tone="muted"
+                    label={hintShown ? '힌트 닫기' : '힌트 열기'}
+                    pressed={hintShown}
+                    // 다시 시도 중에는 힌트 상태가 바뀌지 않게 막는다.
+                    disabled={pendingRating !== null}
+                    onPress={toggleHint}
+                  />
+                ) : null}
+                {card.memo !== null ? (
+                  <IconButton
+                    icon={MemoIcon}
+                    tone="muted"
+                    label={memoShown ? '메모 닫기' : '메모 열기'}
+                    pressed={memoShown}
+                    onPress={() => setMemoOpen((open) => !open)}
+                  />
+                ) : null}
               </View>
             </View>
           ) : null}
@@ -135,7 +164,6 @@ export function ReviewCard({
             onRate={(rating) => onRate(rating, hintUsed)}
             disabled={ratingDisabled}
             pendingRating={pendingRating}
-            hintUsed={hintUsed}
           />
         ) : (
           <Text aria-hidden style={[text('caption'), { color: colors.muted }]}>
@@ -151,11 +179,12 @@ const styles = StyleSheet.create({
   main: { flex: 1, minHeight: 0, paddingTop: space[2], paddingHorizontal: space[4] },
   card: { flex: 1, borderRadius: radius.lg, overflow: 'hidden' },
   front: { flex: 1 },
-  memoArea: { paddingHorizontal: space[2], paddingBottom: space[2], gap: space[2] },
-  memo: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
+  extras: { paddingHorizontal: space[2], paddingBottom: space[2], gap: space[2] },
+  panel: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
   // 캔버스는 손 설정(hand)에 따라 한쪽 모서리에 둔다. 설정이 생기기 전까지 오른쪽이다.
-  memoFloating: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  memoButton: { alignSelf: 'flex-end', marginRight: space[4] },
+  extrasFloating: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  // 캔버스의 아이콘 세로 줄(간격 space-3)에 힌트 버튼을 메모 버튼 위에 더한다.
+  extraButtons: { alignSelf: 'flex-end', marginRight: space[4], gap: space[3] },
   // 캔버스의 덱 이름 자리(왼쪽 위). 긴 글이 스크롤돼도 가리지 않도록 본문 위쪽에 여백을 둔다.
   deck: { position: 'absolute', top: space[3], left: space[4] },
   content: {

@@ -4,9 +4,7 @@ import { isInQueue } from './is-in-queue';
 import { nextQueue } from './next-queue';
 
 // 평가 뒤의 전환. 화면이 평가를 저장한 직후 부르고, 다음 카드와 남은 카드를 돌려받는다.
-type NextCardAfterRating = (
-  review: Review,
-) => Promise<{ card: Card | null; remaining: number }>;
+type NextCardAfterRating = (review: Review) => Promise<{ card: Card | null; remaining: number }>;
 
 const FIRST = 0;
 
