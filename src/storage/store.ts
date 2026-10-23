@@ -39,6 +39,8 @@ export type Review = {
   ratedAt: number;
 };
 
+export type ReviewDayCount = { studyDay: number; count: number };
+
 export type CardWithHistory = { card: Card; history: Review[] };
 
 export type Trash = {
@@ -150,6 +152,11 @@ export interface Store {
    * 같은 ID로 내용이 다르면 conflict로 거부한다.
    */
   rateCard(cardId: string, input: RateInput): Promise<Review>;
+  /**
+   * 학습일별 평가 횟수를 학습일 순서로. 휴지통에 있는 카드와 덱의 이력도 센다(영구 삭제하면 이력과 함께 사라진다).
+   * 연속 복습일 같은 통계는 `features/stats`가 이 값으로 계산한다(ADR 0010).
+   */
+  countReviewsByDay(): Promise<ReviewDayCount[]>;
   /** 카드가 살아 있지 않으면 거부한다. getCard와 같은 기준이다. */
   listReviewHistory(cardId: string): Promise<Review[]>;
 }
@@ -515,6 +522,13 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
       await tx.reviews.append(row);
       return toReview(row);
     });
+  },
+
+  async countReviewsByDay() {
+    return (await port.reviews.countByStudyDay()).map(({ study_day, count }) => ({
+      studyDay: study_day,
+      count,
+    }));
   },
 
   async listReviewHistory(cardId) {

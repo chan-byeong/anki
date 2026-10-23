@@ -521,5 +521,36 @@ export const describeStoreContract = (
         ]);
       });
     });
+
+    describe('복습 횟수', () => {
+      test('학습일별 평가 횟수를 학습일 순서로 읽고, 휴지통의 카드와 덱의 이력도 센다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const apple = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        const rate = (cardId: string, id: string, at: Date) => {
+          harness.clock.set(at.getTime());
+          return store.rateCard(cardId, { id, rating: 'know', hintUsed: false });
+        };
+        await rate(apple.id, 'r1', new Date(2026, 0, 2, 9));
+        await rate(apple.id, 'r2', new Date(2026, 0, 2, 22));
+        await rate(pear.id, 'r3', new Date(2026, 0, 1, 9));
+        await store.trashCard(pear.id);
+
+        expect(await store.countReviewsByDay()).toEqual([
+          { studyDay: 20454, count: 1 },
+          { studyDay: 20455, count: 2 },
+        ]);
+
+        await store.trashDeck(deck.id);
+        expect(await store.countReviewsByDay()).toHaveLength(2);
+      });
+
+      test('이력이 없으면 빈 배열이다', async () => {
+        const { store } = await harness.open();
+
+        expect(await store.countReviewsByDay()).toEqual([]);
+      });
+    });
   });
 };
