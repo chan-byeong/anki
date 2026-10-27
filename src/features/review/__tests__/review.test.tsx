@@ -5,6 +5,7 @@ import { AccessibilityInfo, Text } from 'react-native';
 
 import HomeScreen from '@/app/index';
 import ReviewScreen from '@/app/review/[deckId]';
+import { HandProvider } from '@/features/settings/HandProvider';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore, type Rating, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
@@ -43,9 +44,11 @@ function DeckRoute() {
 const renderApp = async (store: Store, initialUrl: string, theme?: ThemeName) => {
   const Layout = () => (
     <ThemeProvider override={theme}>
-      <StoreProvider store={store}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </StoreProvider>
+      <HandProvider>
+        <StoreProvider store={store}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </StoreProvider>
+      </HandProvider>
     </ThemeProvider>
   );
   await renderRouter(

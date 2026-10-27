@@ -4,6 +4,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from
 import { HintIcon, IconButton, MemoIcon } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import { RatingButtons } from '@/features/review/components/RatingButtons';
+import { useHand } from '@/features/settings/HandProvider';
 import type { Card, Rating } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, size, space } from '@/theme/tokens';
@@ -26,6 +27,8 @@ export function ReviewCard({
 }: ReviewCardProps) {
   const { colors, text } = useTheme();
   const deckName = useDeckName(card.deckId);
+  // 발음·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
+  const { hand } = useHand();
   const [revealed, setRevealed] = useState(false);
   // 정답을 열기 전에 힌트를 열면 힌트를 쓴 것으로 기록되고, 다시 닫아도 남는다.
   // 메모는 언제 열어도 기록하지 않는다(ADR 0017).
@@ -126,7 +129,10 @@ export function ReviewCard({
                   <Text style={text('body')}>{card.memo}</Text>
                 </View>
               ) : null}
-              <View style={styles.extraButtons}>
+              <View
+                testID="review-extra-buttons"
+                style={[styles.extraButtons, hand === 'left' ? styles.leftHand : styles.rightHand]}
+              >
                 {card.hint !== null ? (
                   <IconButton
                     icon={HintIcon}
@@ -181,10 +187,12 @@ const styles = StyleSheet.create({
   front: { flex: 1 },
   extras: { paddingHorizontal: space[2], paddingBottom: space[2], gap: space[2] },
   panel: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
-  // 캔버스는 손 설정(hand)에 따라 한쪽 모서리에 둔다. 설정이 생기기 전까지 오른쪽이다.
   extrasFloating: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // 캔버스의 아이콘 세로 줄(간격 space-3)에 힌트 버튼을 메모 버튼 위에 더한다.
-  extraButtons: { alignSelf: 'flex-end', marginRight: space[4], gap: space[3] },
+  // 캔버스(Review-7, hand=left)는 손 설정에 따라 줄을 그쪽 모서리에 두고 같은 쪽에 space-4를 띄운다.
+  extraButtons: { gap: space[3] },
+  rightHand: { alignSelf: 'flex-end', marginRight: space[4] },
+  leftHand: { alignSelf: 'flex-start', marginLeft: space[4] },
   // 캔버스의 덱 이름 자리(왼쪽 위). 긴 글이 스크롤돼도 가리지 않도록 본문 위쪽에 여백을 둔다.
   deck: { position: 'absolute', top: space[3], left: space[4] },
   content: {

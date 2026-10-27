@@ -3,6 +3,7 @@ import { userEvent } from '@testing-library/react-native';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import SettingsScreen from '@/app/settings';
+import { HandProvider } from '@/features/settings/HandProvider';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
@@ -41,9 +42,11 @@ const renderSettings = async (storage: PreferenceStorage) => {
   });
   const Layout = () => (
     <ThemeProvider storage={storage}>
-      <StoreProvider store={store}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </StoreProvider>
+      <HandProvider>
+        <StoreProvider store={store}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </StoreProvider>
+      </HandProvider>
     </ThemeProvider>
   );
   await renderRouter({ _layout: Layout, settings: SettingsScreen }, { initialUrl: '/settings' });
