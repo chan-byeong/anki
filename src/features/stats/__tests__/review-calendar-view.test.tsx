@@ -85,12 +85,15 @@ describe('ReviewCalendar', () => {
     expect(screen.getByText('6월 29일 · 0장')).toBeOnTheScreen();
   });
 
-  test('달력을 누르면 누른 자리의 날을 고른다', async () => {
+  test('다른 날을 고른 뒤 달력의 아무 곳이나 누르면 오늘로 돌아온다', async () => {
+    const user = userEvent.setup();
     await renderCalendar();
-    // 18열이 폭 300에 퍼진다. 첫 열 첫 칸의 가운데를 누른다.
-    await fireEvent(calendar(), 'layout', { nativeEvent: { layout: { width: 300, height: 120 } } });
+    await user.press(screen.getByRole('button', { name: '이전 날' }));
+    await user.press(screen.getByRole('button', { name: '이전 날' }));
+
     await fireEvent.press(calendar(), { nativeEvent: { locationX: 6, locationY: 6 } });
 
-    expect(screen.getByText('6월 28일 · 0장')).toBeOnTheScreen();
+    expect(screen.getByText('오늘 · 3장')).toBeOnTheScreen();
+    expect(calendar()).toHaveAccessibilityValue({ text: '10월 27일 오늘 3장' });
   });
 });

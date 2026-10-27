@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type AccessibilityActionEvent,
-  type GestureResponderEvent,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 
 import { ChevronLeftIcon, ChevronRightIcon, IconButton } from '@/components';
 import { mixColor } from '@/theme/mix-color';
@@ -33,7 +25,6 @@ interface ReviewCalendarProps {
 export function ReviewCalendar({ weeks, today }: ReviewCalendarProps) {
   const { colors, text } = useTheme();
   const [selected, setSelected] = useState(today);
-  const [width, setWidth] = useState(0);
 
   const days = weeks.flat().filter((day): day is CalendarDay => day !== null);
   const first = days[0].studyDay;
@@ -50,16 +41,6 @@ export function ReviewCalendar({ weeks, today }: ReviewCalendarProps) {
     if (nativeEvent.actionName === 'decrement') move(-1);
   };
 
-  // 누른 자리에서 가장 가까운 칸. 열은 폭에 고르게 퍼져 있다(space-between).
-  const onPress = ({ nativeEvent }: GestureResponderEvent) => {
-    if (width === 0) return;
-    const pitch = (width - CELL) / (weeks.length - 1);
-    const column = Math.round((nativeEvent.locationX - CELL / 2) / pitch);
-    const row = Math.round((nativeEvent.locationY - CELL / 2) / (CELL + GAP));
-    const picked = weeks[column]?.[row];
-    if (picked) setSelected(picked.studyDay);
-  };
-
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -71,8 +52,8 @@ export function ReviewCalendar({ weeks, today }: ReviewCalendarProps) {
         }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={onAction}
-        onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
-        onPress={onPress}
+        // 칸이 작아 누른 칸을 고르지 않고, 어디를 누르든 오늘로 돌아온다.
+        onPress={() => setSelected(today)}
         style={styles.grid}
       >
         {weeks.map((week, column) => (
