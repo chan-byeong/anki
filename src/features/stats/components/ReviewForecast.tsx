@@ -83,7 +83,7 @@ export function ReviewForecast({ days, today }: ReviewForecastProps) {
 }
 
 const styles = StyleSheet.create({
-  list: { height: 132, flexDirection: 'row', alignItems: 'flex-end', gap: space[2] },
+  list: { minHeight: 132, flexDirection: 'row', alignItems: 'flex-end', gap: space[2] },
   day: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: space[1] },
   number: { fontVariant: ['tabular-nums'] },
   bar: { width: '100%', maxWidth: 28, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
