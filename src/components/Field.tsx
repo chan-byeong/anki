@@ -1,5 +1,12 @@
 import { useRef, type RefObject } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, type TextInputProps } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  type TextInputProps,
+  type TextInputInstance,
+} from 'react-native';
 
 import { space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -30,7 +37,7 @@ interface FieldProps
   first?: boolean;
   // 완료 키로 다음 칸으로 넘어갈 때 호출 측이 잡는 자리. 이름표를 눌러도 이 ref로 입력에 들어가므로
   // 함수 ref는 받지 않는다.
-  ref?: RefObject<TextInput | null>;
+  ref?: RefObject<TextInputInstance | null>;
 }
 
 export function Field({
@@ -43,7 +50,7 @@ export function Field({
   ...input
 }: FieldProps) {
   const { colors, text } = useTheme();
-  const fallback = useRef<TextInput>(null);
+  const fallback = useRef<TextInputInstance>(null);
   const ref = inputRef ?? fallback;
   const name = optional ? `${label} (선택)` : label;
   const valueStyle =

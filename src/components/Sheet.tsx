@@ -1,5 +1,14 @@
 import { useEffect, useId, useRef, type RefObject } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type TextInstance,
+  type ViewInstance,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -36,7 +45,7 @@ interface SheetProps {
   onClose: () => void;
   // 닫힌 뒤 포커스를 돌려줄 요소(ADR 0006, 0007). 닫힐 때의 값을 쓰므로, 연쇄 흐름에서는 다음 시트로
   // 넘어가는 시트에 undefined를 주고 마지막 시트에 같은 ref를 넘긴다.
-  triggerRef?: RefObject<View | null>;
+  triggerRef?: RefObject<ViewInstance | null>;
   // 완전히 닫힌 뒤(포커스를 돌려준 다음) 불린다. 다음 시트는 여기서 연다. iOS는 닫히는 Modal 위에
   // 다른 Modal을 띄우지 못할 수 있다. 트리거가 사라져 돌아갈 곳이 없을 때 포커스를 보낼 곳도 여기서 정한다(ADR 0007).
   onClosed?: () => void;
@@ -77,7 +86,7 @@ function useDevWarnings(visible: boolean, kind: SheetKind, actions: readonly She
 // iOS와 웹에만 있어서, Android는 visible이 true에서 false로 바뀔 때 보낸다.
 function useAfterClose(
   visible: boolean,
-  triggerRef?: RefObject<View | null>,
+  triggerRef?: RefObject<ViewInstance | null>,
   onClosed?: () => void,
 ): () => void {
   const wasVisible = useRef(visible);
@@ -110,8 +119,8 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const titleId = useId();
-  const titleRef = useRef<Text>(null);
-  const firstActionRef = useRef<View>(null);
+  const titleRef = useRef<TextInstance>(null);
+  const firstActionRef = useRef<ViewInstance>(null);
   const afterClose = useAfterClose(visible, triggerRef, onClosed);
   useDevWarnings(visible, kind, actions);
 
@@ -227,7 +236,7 @@ export function Sheet({
 }
 
 interface SheetItemProps {
-  ref?: RefObject<View | null>;
+  ref?: RefObject<ViewInstance | null>;
   action: SheetAction;
   hint?: string;
   first: boolean;

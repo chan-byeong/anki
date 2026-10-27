@@ -1,5 +1,12 @@
 import { useEffect, type Ref } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewInstance,
+} from 'react-native';
 
 import { radius, size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -11,7 +18,7 @@ export type NoticeTone = 'info' | 'warn' | 'danger';
 
 // 접근성 프롭과 ref는 한 덩어리로 읽히는 글자 묶음에 붙는다. 행동 버튼은 따로다.
 interface NoticeProps extends InheritedA11yProps<A11yRoleProps | A11yLabelProps | A11yLiveProps> {
-  ref?: Ref<View>;
+  ref?: Ref<ViewInstance>;
   tone?: NoticeTone;
   title: string;
   body?: string;

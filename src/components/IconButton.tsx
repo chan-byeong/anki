@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { Pressable, StyleSheet, type View } from 'react-native';
+import { Pressable, StyleSheet, type ViewInstance } from 'react-native';
 
 import { radius, size } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -12,7 +12,7 @@ export interface IconButtonProps extends InheritedA11yProps<
   A11yRoleProps | A11yLabelProps | A11yStateProps
 > {
   // 시트를 여는 버튼이면 닫힌 뒤 이 ref로 포커스를 되돌린다.
-  ref?: Ref<View>;
+  ref?: Ref<ViewInstance>;
   icon: IconComponent;
   // 아이콘만 있으므로 접근성 이름이 유일한 이름이다. 목적지까지 적는다("설정으로").
   label: string;

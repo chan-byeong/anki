@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -38,7 +38,7 @@ export default function DeckScreen() {
     () => goBack('/'),
   );
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<View>(null);
+  const menuRef = useRef<ViewInstance>(null);
   const [query, setQuery] = useState('');
 
   const addCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });

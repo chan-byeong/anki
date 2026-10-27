@@ -8,7 +8,7 @@ import {
   userEvent,
 } from '@testing-library/react-native';
 import React from 'react';
-import { AccessibilityInfo, Platform, type View } from 'react-native';
+import { AccessibilityInfo, Platform, type ViewInstance } from 'react-native';
 
 // Modal이 받은 props를 가로채서 onRequestClose·onShow·animationType을 테스트에서 직접 호출/검증한다.
 // (RNTL 쿼리로는 Modal의 props에 닿을 수 없다. 변수 이름이 mock으로 시작해야 jest.mock 안에서 쓸 수 있다.)
@@ -386,7 +386,7 @@ describe('초기 포커스 (ADR 0007)', () => {
 
 describe('포커스 복귀 (ADR 0006, 0007)', () => {
   let sendEvent: jest.SpyInstance;
-  const trigger = { label: 'trigger' } as unknown as View;
+  const trigger = { label: 'trigger' } as unknown as ViewInstance;
   const triggerRef = { current: trigger };
 
   beforeEach(() => {
@@ -438,7 +438,7 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
     // react-native-web의 AccessibilityInfo에는 sendAccessibilityEvent가 없고, Modal은 onDismiss를 부른다.
     jest.replaceProperty(Platform, 'OS', 'web');
     const focus = jest.fn();
-    const webTrigger = { current: { focus } as unknown as View };
+    const webTrigger = { current: { focus } as unknown as ViewInstance };
     const view = await render(sheet({ triggerRef: webTrigger }));
     await view.rerender(sheet({ triggerRef: webTrigger, visible: false }));
 
