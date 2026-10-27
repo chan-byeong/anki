@@ -6,7 +6,7 @@ export { ListRow, type ListRowTrailing } from './ListRow';
 export { ListSection } from './ListSection';
 export { Notice, type NoticeTone } from './Notice';
 export { PageHeader } from './PageHeader';
-export { RatingMark } from './RatingMark';
+export { RatingMark, ratingColor } from './RatingMark';
 export { Segmented } from './Segmented';
 export { Sheet, type SheetAction, type SheetKind } from './Sheet';
 export { StatusDot, type StatusDotState } from './StatusDot';
