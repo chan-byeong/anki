@@ -27,7 +27,7 @@ export function ReviewCard({
 }: ReviewCardProps) {
   const { colors, text } = useTheme();
   const deckName = useDeckName(card.deckId);
-  // 발음·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
+  // 힌트·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
   const { hand } = useHand();
   const [revealed, setRevealed] = useState(false);
   // 정답을 열기 전에 힌트를 열면 힌트를 쓴 것으로 기록되고, 다시 닫아도 남는다.
@@ -189,7 +189,8 @@ const styles = StyleSheet.create({
   panel: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
   extrasFloating: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // 캔버스의 아이콘 세로 줄(간격 space-3)에 힌트 버튼을 메모 버튼 위에 더한다.
-  // 캔버스(Review-7, hand=left)는 손 설정에 따라 줄을 그쪽 모서리에 두고 같은 쪽에 space-4를 띄운다.
+  // 캔버스(Review-1~3의 hand)는 줄을 손 쪽 모서리에 두고 메모 버튼만 그쪽으로 space-4 띄운다.
+  // 그 아래 붙는 발음 버튼이 아직 없어 줄 전체에 띄웠다. 발음 버튼을 더할 때 이 여백을 메모·힌트 버튼으로 옮긴다.
   extraButtons: { gap: space[3] },
   rightHand: { alignSelf: 'flex-end', marginRight: space[4] },
   leftHand: { alignSelf: 'flex-start', marginLeft: space[4] },

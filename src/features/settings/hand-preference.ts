@@ -1,6 +1,6 @@
 import type { PreferenceStorage } from '@/theme/theme-preference';
 
-// 주로 쓰는 손. 복습 화면의 발음·메모 버튼을 어느 쪽 모서리에 모을지 정한다.
+// 주로 쓰는 손. 복습 화면의 카드 버튼(힌트·메모, 이후 발음)을 어느 쪽 모서리에 모을지 정한다.
 // 테마처럼 기기에만 남는 화면 설정이라 Store(동기화 대상)에 넣지 않는다.
 export type Hand = 'left' | 'right';
 

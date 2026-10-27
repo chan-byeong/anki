@@ -13,7 +13,7 @@ import type { PreferenceStorage } from '@/theme/theme-preference';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
-// 설정에서 주로 쓰는 손을 고르고, 복습 화면의 발음·메모 버튼 자리가 그 쪽으로 가는지 실제 라우터 위에서 확인한다.
+// 설정에서 주로 쓰는 손을 고르고, 복습 화면의 카드 버튼(힌트·메모) 자리가 그 쪽으로 가는지 실제 라우터 위에서 확인한다.
 jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,

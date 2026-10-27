@@ -74,15 +74,15 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider storage={kvStore}>
-      {storeState.kind === 'open' ? (
-        <HandProvider storage={kvStore}>
+      <HandProvider storage={kvStore}>
+        {storeState.kind === 'open' ? (
           <StoreProvider store={storeState.store}>
             <ThemedStack />
           </StoreProvider>
-        </HandProvider>
-      ) : (
-        <StorageErrorScreen onRetry={retry} retrying={retrying} />
-      )}
+        ) : (
+          <StorageErrorScreen onRetry={retry} retrying={retrying} />
+        )}
+      </HandProvider>
     </ThemeProvider>
   );
 }
