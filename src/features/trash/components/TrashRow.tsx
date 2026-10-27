@@ -1,5 +1,5 @@
 import { useRef, type RefObject } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
 import { Button, DeckIcon } from '@/components';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -13,8 +13,8 @@ interface TrashRowProps {
   sub: string;
   deck?: boolean;
   last?: boolean;
-  onRestore: (trigger: RefObject<View | null>) => void;
-  onOpen?: (trigger: RefObject<View | null>) => void;
+  onRestore: (trigger: RefObject<ViewInstance | null>) => void;
+  onOpen?: (trigger: RefObject<ViewInstance | null>) => void;
 }
 
 export function TrashRow({
@@ -26,8 +26,8 @@ export function TrashRow({
   onOpen,
 }: TrashRowProps) {
   const { colors, text } = useTheme();
-  const mainRef = useRef<View>(null);
-  const restoreRef = useRef<View>(null);
+  const mainRef = useRef<ViewInstance>(null);
+  const restoreRef = useRef<ViewInstance>(null);
   const label = deck ? `덱 ${title}, ${sub}` : `${title}, ${sub}`;
 
   const body = (

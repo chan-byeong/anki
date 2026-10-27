@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
 import { size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -16,7 +16,7 @@ export type ListRowTrailing =
 
 // 접근성 프롭과 ref는 행 전체가 아니라 눌리는 본문(onPress가 없으면 본문 View)에 붙는다.
 interface ListRowProps extends InheritedA11yProps<A11yRoleProps> {
-  ref?: Ref<View>;
+  ref?: Ref<ViewInstance>;
   title: string;
   sub?: string;
   // 일본어(lang="ja") 제목은 JP 글리프 글꼴을 쓴다.

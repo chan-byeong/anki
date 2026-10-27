@@ -1,5 +1,12 @@
 import { useRef, useState, type RefObject } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type TextInstance,
+  type ViewInstance,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, ListSection, Notice, PageHeader, Sheet, Toast, TopBar } from '@/components';
@@ -47,11 +54,12 @@ export default function TrashScreen() {
   const insets = useSafeAreaInsets();
   const { state, reload } = useTrash();
   const actions = useTrashActions(reload);
-  const headingRef = useRef<Text>(null);
+  const headingRef = useRef<TextInstance>(null);
   // 시트가 닫혀도 대상과 트리거를 남긴다. 내려가는 동안 문구가 비지 않고, 닫힐 때 트리거로 포커스를 돌려준다(ADR 0007).
-  const [item, setItem] = useState<{ target: Target; trigger: RefObject<View | null> } | null>(
-    null,
-  );
+  const [item, setItem] = useState<{
+    target: Target;
+    trigger: RefObject<ViewInstance | null>;
+  } | null>(null);
   const [itemOpen, setItemOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   // 확인 문구는 열 때 정해 둔다. 지운 뒤 목록을 다시 읽어도 내려가는 시트의 숫자가 바뀌지 않는다.
@@ -61,17 +69,19 @@ export default function TrashScreen() {
   // 확인 시트가 닫힐 때 포커스를 돌려준다.
   const [handingOff, setHandingOff] = useState(false);
   const [emptyOpen, setEmptyOpen] = useState(false);
-  const emptyRef = useRef<View>(null);
+  const emptyRef = useRef<ViewInstance>(null);
   // 덱이 휴지통에 있어 복구하지 못한 카드. 안내를 닫아도 남겨서 내려가는 동안 문구가 비지 않게 한다.
   const [blocked, setBlocked] = useState<TrashedCard | null>(null);
   const [blockedOpen, setBlockedOpen] = useState(false);
   // 안내 시트가 닫힌 뒤 포커스를 돌려줄, 카드를 복구하려고 누른 요소.
-  const [blockedTrigger, setBlockedTrigger] = useState<RefObject<View | null> | undefined>();
+  const [blockedTrigger, setBlockedTrigger] = useState<
+    RefObject<ViewInstance | null> | undefined
+  >();
   // 시트가 완전히 닫히면 부른다. 한 번에 시트 하나만 열리므로 하나로 충분하다.
   const sheetClosed = useRef<() => void>(() => {});
   const empty = state.kind === 'ready' && state.decks.length === 0 && state.cards.length === 0;
 
-  const open = (target: Target) => (trigger: RefObject<View | null>) => {
+  const open = (target: Target) => (trigger: RefObject<ViewInstance | null>) => {
     setItem({ target, trigger });
     setHandingOff(false);
     setItemOpen(true);
@@ -97,7 +107,11 @@ export default function TrashScreen() {
     }
   };
 
-  const restore = (target: Target, trigger: RefObject<View | null>, closed: Promise<void>) => {
+  const restore = (
+    target: Target,
+    trigger: RefObject<ViewInstance | null>,
+    closed: Promise<void>,
+  ) => {
     if (target.kind === 'deck') {
       void settle(actions.restoreDeck(target.deck), closed);
       return;

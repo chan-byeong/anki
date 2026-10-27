@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
 import { radius, size as sizeToken, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -11,7 +11,7 @@ export type ButtonSize = 'lg' | 'sm';
 
 interface ButtonProps extends InheritedA11yProps<A11yRoleProps | A11yLabelProps | A11yStateProps> {
   // 접근성 포커스를 보낼 때 쓴다(Sheet 첫 포커스, 닫힌 뒤 트리거로 복귀).
-  ref?: Ref<View>;
+  ref?: Ref<ViewInstance>;
   // 아이콘만 있는 버튼일 때는 접근성 라벨로만 쓰인다.
   label: string;
   // 화면 글자와 다른 이름이 필요할 때("懐かしい 복구"). 없으면 label(+count)을 읽는다.
