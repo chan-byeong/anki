@@ -24,6 +24,10 @@ import { size, space } from '@/theme/tokens';
 
 const openNewDeck = () => router.push('/deck/new');
 
+// 고른 덱이 복습에 더하는 카드 수. 오늘 대기열이 빈 덱은 모든 카드로 복습한다(listReviewCardsOf).
+const reviewCountOf = ({ todayCount, cardCount }: DeckListItem): number =>
+  todayCount > 0 ? todayCount : cardCount;
+
 export default function HomeScreen() {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
@@ -31,11 +35,11 @@ export default function HomeScreen() {
   const lowSpace = useLowSpace();
   // 여러 덱 선택 모드. null이면 선택 모드가 아니고, 아니면 선택한 덱 ID들이다.
   const [chosen, setSelected] = useState<string[] | null>(null);
-  // 선택 중에 덱이 지워지거나 오늘 복습이 끝나면 선택에서 뺀다. 개수와 합계가 어긋나지 않게 한다.
+  // 선택 중에 덱이 지워지거나 카드가 없어지면 선택에서 뺀다. 개수와 합계가 어긋나지 않게 한다.
   const selected =
     chosen !== null && state.kind === 'ready'
       ? state.items
-          .filter(({ deck, todayCount }) => chosen.includes(deck.id) && todayCount > 0)
+          .filter(({ deck, cardCount }) => chosen.includes(deck.id) && cardCount > 0)
           .map(({ deck }) => deck.id)
       : chosen;
 
@@ -111,10 +115,10 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
   const insets = useSafeAreaInsets();
   const allDone = items.every((item) => item.todayCount === 0);
   const [menuDeckId, setMenuDeckId] = useState<string | null>(null);
-  const guide = useLongPressGuide(!allDone);
+  const guide = useLongPressGuide(items.some((item) => item.cardCount > 0));
   const selectedCount = items
     .filter(({ deck }) => selected?.includes(deck.id))
-    .reduce((sum, item) => sum + item.todayCount, 0);
+    .reduce((sum, item) => sum + reviewCountOf(item), 0);
 
   const toggle = (deckId: string) => {
     if (selected === null) return;

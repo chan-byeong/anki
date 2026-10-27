@@ -102,7 +102,7 @@ describe('덱 목록', () => {
     ).toBeOnTheScreen();
     // 오늘 복습이 끝나도 덱에 있는 카드 수는 보인다. 휴지통에 넣은 카드는 세지 않는다.
     expect(
-      screen.getByRole('button', { name: '개발 지식 덱 상세, 오늘 복습 끝, 전체 2장' }),
+      screen.getByRole('button', { name: '개발 지식 복습 시작, 오늘 복습 끝, 전체 2장' }),
     ).toBeOnTheScreen();
     expect(screen.getAllByText('2장')).toHaveLength(2);
     expect(screen.queryByText('오늘 복습할 카드 없음')).toBeNull();
@@ -137,6 +137,32 @@ describe('덱 목록', () => {
     expect(screen.getByText(`/deck/${dev.id}`)).toBeOnTheScreen();
   });
 
+  test('오늘 복습이 끝난 덱을 누르면 그 덱의 모든 카드로 복습을 시작한다', async () => {
+    const store = newStore();
+    const dev = await store.createDeck({ name: '개발 지식' });
+    const git = await store.createCard(dev.id, { front: 'git', back: '버전 관리' });
+    await store.rateCard(git.id, { id: 'review-1', rating: 'know', hintUsed: false });
+    await renderApp(store);
+    const user = setupUser();
+
+    await user.press(
+      screen.getByRole('button', { name: '개발 지식 복습 시작, 오늘 복습 끝, 전체 1장' }),
+    );
+
+    expect(screen.getByText(`/review/${dev.id}`)).toBeOnTheScreen();
+  });
+
+  test('카드가 없는 덱을 누르면 덱 상세로 간다', async () => {
+    const store = newStore();
+    const empty = await store.createDeck({ name: '빈 덱' });
+    await renderApp(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: '빈 덱 덱 상세, 오늘 복습 끝, 전체 0장' }));
+
+    expect(screen.getByText(`/deck/${empty.id}`)).toBeOnTheScreen();
+  });
+
   test('모든 덱의 오늘 복습이 끝나면 아래에 알린다', async () => {
     const store = newStore();
     await store.createDeck({ name: '개발 지식' });
@@ -158,5 +184,78 @@ describe('덱 만들기', () => {
     await user.type(screen.getByLabelText('이름'), '   ');
     expect(create).toBeDisabled();
     expect(await store.listDecks()).toEqual([]);
+  });
+});
+
+describe('여러 덱 선택', () => {
+  // 오늘 끝난 덱도 고를 수 있고, 고르면 그 덱의 모든 카드가 복습에 들어간다. 카드가 없는 덱은 고를 수 없다.
+  const seedDecks = async () => {
+    const store = newStore();
+    const words = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(words.id, { front: 'apple', back: '사과' });
+    await store.createCard(words.id, { front: 'pear', back: '배' });
+    const dev = await store.createDeck({ name: '개발 지식' });
+    for (const front of ['git', 'npm', 'tsc']) {
+      const card = await store.createCard(dev.id, { front, back: '도구' });
+      await store.rateCard(card.id, { id: `review-${front}`, rating: 'know', hintUsed: false });
+    }
+    const empty = await store.createDeck({ name: '빈 덱' });
+    return { store, words, dev, empty };
+  };
+
+  test('오늘 끝난 덱을 길게 눌러 선택을 시작하고, 고른 덱의 모든 카드 수를 더한다', async () => {
+    const { store, words, dev } = await seedDecks();
+    await renderApp(store);
+    const user = setupUser();
+
+    await user.longPress(
+      screen.getByRole('button', { name: '개발 지식 복습 시작, 오늘 복습 끝, 전체 3장' }),
+    );
+
+    expect(screen.getByRole('header', { name: '1개 선택' })).toBeOnTheScreen();
+    expect(
+      screen.getByRole('checkbox', { name: '개발 지식 복습에 포함, 전체 카드 3장' }),
+    ).toBeChecked();
+    expect(screen.getByRole('button', { name: '복습 시작 3장' })).toBeEnabled();
+
+    await user.press(screen.getByRole('checkbox', { name: '영어 단어 복습에 포함, 2장' }));
+
+    expect(screen.getByRole('button', { name: '복습 시작 5장' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: '복습 시작 5장' }));
+    expect(screen.getByText(`/review/${words.id},${dev.id}`)).toBeOnTheScreen();
+  });
+
+  test('선택 중에는 줄을 눌러도 덱을 고르거나 뺀다', async () => {
+    const { store } = await seedDecks();
+    await renderApp(store);
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: '영어 단어 메뉴' }));
+    await user.press(await screen.findByRole('button', { name: '여러 덱 선택' }));
+    const words = screen.getByRole('checkbox', { name: '영어 단어 복습에 포함, 2장' });
+    expect(words).toBeChecked();
+
+    await user.press(screen.getByText('영어 단어'));
+    expect(words).not.toBeChecked();
+    expect(screen.getByRole('header', { name: '0개 선택' })).toBeOnTheScreen();
+
+    await user.press(screen.getByText('개발 지식'));
+    expect(
+      screen.getByRole('checkbox', { name: '개발 지식 복습에 포함, 전체 카드 3장' }),
+    ).toBeChecked();
+    await user.press(screen.getByText('빈 덱'));
+    expect(screen.getByRole('header', { name: '1개 선택' })).toBeOnTheScreen();
+  });
+
+  test('카드가 없는 덱은 고를 수 없다', async () => {
+    const { store } = await seedDecks();
+    await renderApp(store);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: '빈 덱 메뉴' }));
+    await user.press(await screen.findByRole('button', { name: '여러 덱 선택' }));
+
+    expect(screen.getByRole('header', { name: '0개 선택' })).toBeOnTheScreen();
+    expect(screen.queryByRole('checkbox', { name: /빈 덱/ })).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
   });
 });

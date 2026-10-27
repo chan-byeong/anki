@@ -2,7 +2,7 @@ import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
 import { createStore, type Rating } from '@/storage/store';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 
-import { countDueOn, countQueue, listQueue, listQueueOf } from '../queue';
+import { countDueOn, countQueue, listQueue, listQueueOf, listReviewCardsOf } from '../queue';
 
 // 대기열은 Store가 읽어 주는 카드와 학습 이력에서 features/review가 만든다(ADR 0010).
 // 날짜는 Jest의 고정 TZ에서 시계를 해당 날의 정오로 옮겨 만든다(ADR 0013).
@@ -258,6 +258,61 @@ describe('listQueueOf', () => {
     await store.trashDeck(trashed.id);
 
     await expect(listQueueOf(store, [deck.id, trashed.id], FIRST_DAY)).rejects.toMatchObject({
+      code: 'trashed',
+    });
+  });
+});
+
+describe('listReviewCardsOf', () => {
+  // 오늘 대기열이 빈 덱(홈의 체크 표시)을 고르면 그 덱의 모든 카드를 섞어서 복습한다.
+  test('오늘 대기열이 있는 덱은 대기열과 같다', async () => {
+    const { store, deck, card, rate } = await openWithCard();
+    const later = await store.createCard(deck.id, { front: 'pear', back: '배' });
+    await rate(later.id, 'know');
+
+    const cards = await listReviewCardsOf(store, [deck.id], FIRST_DAY);
+
+    expect(cards.map(({ id }) => id)).toEqual([card.id]);
+  });
+
+  test('오늘 대기열이 빈 덱은 살아 있는 모든 카드를 섞어서 낸다', async () => {
+    const { store, deck, card: apple, rate } = await openWithCard();
+    const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+    const plum = await store.createCard(deck.id, { front: 'plum', back: '자두' });
+    const trashed = await store.createCard(deck.id, { front: 'grape', back: '포도' });
+    for (const { id } of [apple, pear, plum]) await rate(id, 'know');
+    await store.trashCard(trashed.id);
+    expect(await listQueueOf(store, [deck.id], FIRST_DAY)).toEqual([]);
+
+    // 피셔-예이츠 섞기에서 늘 0을 고르면 [a, b, c]가 [b, c, a]가 된다.
+    const cards = await listReviewCardsOf(store, [deck.id], FIRST_DAY, () => 0);
+
+    expect(cards.map(({ id }) => id)).toEqual([pear.id, plum.id, apple.id]);
+  });
+
+  test('여러 덱이면 대기열이 있는 덱의 카드가 먼저, 대기열이 빈 덱의 카드가 그 뒤에 온다', async () => {
+    const { store, deck: words, card: apple, rate } = await openWithCard();
+    const dev = await store.createDeck({ name: '개발 지식' });
+    const git = await store.createCard(dev.id, { front: 'git', back: '버전 관리' });
+    await rate(apple.id, 'know');
+
+    const cards = await listReviewCardsOf(store, [words.id, dev.id], FIRST_DAY);
+
+    expect(cards.map(({ id }) => id)).toEqual([git.id, apple.id]);
+  });
+
+  test('카드가 없는 덱은 아무 카드도 내지 않는다', async () => {
+    const { store } = await openWithCard();
+    const empty = await store.createDeck({ name: '빈 덱' });
+
+    expect(await listReviewCardsOf(store, [empty.id], FIRST_DAY)).toEqual([]);
+  });
+
+  test('선택한 덱 중 하나라도 없거나 휴지통에 있으면 거부한다', async () => {
+    const { store, deck } = await openWithCard();
+    await store.trashDeck(deck.id);
+
+    await expect(listReviewCardsOf(store, [deck.id], FIRST_DAY)).rejects.toMatchObject({
       code: 'trashed',
     });
   });
