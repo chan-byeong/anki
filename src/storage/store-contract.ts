@@ -278,6 +278,84 @@ export const describeStoreContract = (
       });
     });
 
+    describe('영구 삭제', () => {
+      test('먼저 따로 지운 카드는 덱이 휴지통에 있어도 영구 삭제할 수 있고, 덱 복구에는 영향이 없다', async () => {
+        const { store, port } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const separate = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const together = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.trashCard(separate.id);
+        await store.trashDeck(deck.id);
+
+        await store.deleteCardPermanently(separate.id);
+
+        expect(await port.cards.get(separate.id)).toBeNull();
+        expect(await port.tombstones.get(separate.id)).toEqual({ id: separate.id, kind: 'card' });
+        expect((await store.listTrash()).cards).toEqual([]);
+        await store.restoreDeck(deck.id);
+        expect(await store.listCards(deck.id)).toEqual([together]);
+      });
+
+      test('영구 삭제한 카드는 학습 이력과 함께 사라지고, 이후 수정이나 복구로 되살아나지 않는다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const card = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        await store.rateCard(card.id, { id: 'review-1', rating: 'know', hintUsed: false });
+        await store.trashCard(card.id);
+
+        await store.deleteCardPermanently(card.id);
+
+        await expect(store.listReviewHistory(card.id)).rejects.toMatchObject({
+          code: 'not_found',
+        });
+        await expect(
+          store.updateCard(card.id, { front: 'apple', back: '사과' }),
+        ).rejects.toMatchObject({ code: 'not_found' });
+        await expect(store.restoreCard(card.id)).rejects.toMatchObject({ code: 'not_found' });
+        expect(await store.listCards(deck.id)).toEqual([]);
+      });
+
+      test('휴지통을 비우면 휴지통의 덱과 그 카드 전부, 따로 지운 카드가 사라지고 살아 있는 자료는 남는다', async () => {
+        const { store, port } = await harness.open();
+        const trashedDeck = await store.createDeck({ name: '영어 단어' });
+        const separate = await store.createCard(trashedDeck.id, { front: 'apple', back: '사과' });
+        const together = await store.createCard(trashedDeck.id, { front: 'pear', back: '배' });
+        const liveDeck = await store.createDeck({ name: '개발 지식' });
+        const kept = await store.createCard(liveDeck.id, { front: 'git', back: '버전 관리' });
+        const loose = await store.createCard(liveDeck.id, { front: 'tcp', back: '전송 계층' });
+        await store.rateCard(together.id, { id: 'review-1', rating: 'know', hintUsed: false });
+        await store.trashCard(separate.id);
+        await store.trashCard(loose.id);
+        await store.trashDeck(trashedDeck.id);
+
+        await store.emptyTrash();
+
+        expect(await store.listTrash()).toEqual({ decks: [], cards: [] });
+        expect(await store.countTrash()).toBe(0);
+        for (const id of [separate.id, together.id, loose.id]) {
+          expect(await port.cards.get(id)).toBeNull();
+          expect(await port.tombstones.get(id)).toEqual({ id, kind: 'card' });
+        }
+        expect(await port.decks.get(trashedDeck.id)).toBeNull();
+        expect(await port.tombstones.get(trashedDeck.id)).toEqual({
+          id: trashedDeck.id,
+          kind: 'deck',
+        });
+        expect(await port.reviews.get('review-1')).toBeNull();
+        expect(await store.listDecks()).toEqual([liveDeck]);
+        expect(await store.listCards(liveDeck.id)).toEqual([kept]);
+      });
+
+      test('비어 있는 휴지통을 비워도 아무것도 바뀌지 않는다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+
+        await store.emptyTrash();
+
+        expect(await store.listDecks()).toEqual([deck]);
+      });
+    });
+
     describe('휴지통 목록', () => {
       test('삭제한 덱과 카드가 목록에 나타나고, 살아 있는 덱과 카드는 나타나지 않는다', async () => {
         const { store } = await harness.open();

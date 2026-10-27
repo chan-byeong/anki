@@ -1,19 +1,12 @@
 import { useEffect, useId, useRef, type RefObject } from 'react';
-import {
-  AccessibilityInfo,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { moveFocus } from '@/utils/move-focus';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, size, space } from '../theme/tokens';
-import { Button } from './Button';
+import { Button, type ButtonVariant } from './Button';
 import type { IconComponent } from './icons';
 
 export type SheetKind = 'menu' | 'confirm';
@@ -44,6 +37,9 @@ interface SheetProps {
   // 닫힌 뒤 포커스를 돌려줄 요소(ADR 0006, 0007). 닫힐 때의 값을 쓰므로, 연쇄 흐름에서는 다음 시트로
   // 넘어가는 시트에 undefined를 주고 마지막 시트에 같은 ref를 넘긴다.
   triggerRef?: RefObject<View | null>;
+  // 완전히 닫힌 뒤(포커스를 돌려준 다음) 불린다. 다음 시트는 여기서 연다. iOS는 닫히는 Modal 위에
+  // 다른 Modal을 띄우지 못할 수 있다. 트리거가 사라져 돌아갈 곳이 없을 때 포커스를 보낼 곳도 여기서 정한다(ADR 0007).
+  onClosed?: () => void;
 }
 
 const DESTRUCTIVE_HINT = '되돌릴 수 없는 동작입니다';
@@ -54,13 +50,9 @@ function initialFocusIndex(actions: readonly SheetAction[]): number {
   return index === -1 ? 0 : index;
 }
 
-// react-native-web의 AccessibilityInfo에는 sendAccessibilityEvent가 없다. 웹의 ref는 DOM 요소라 focus()로 옮긴다.
-function moveFocus(target: View | Text): void {
-  if (Platform.OS === 'web') {
-    (target as unknown as { focus?: () => void }).focus?.();
-    return;
-  }
-  AccessibilityInfo.sendAccessibilityEvent(target, 'focus');
+function confirmVariant(action: SheetAction): ButtonVariant {
+  if (action.destructive) return 'danger';
+  return action.role === 'cancel' || action.danger ? 'ghost' : 'primary';
 }
 
 function devWarning(kind: SheetKind, actions: readonly SheetAction[]): string | null {
@@ -81,22 +73,27 @@ function useDevWarnings(visible: boolean, kind: SheetKind, actions: readonly She
   }, [warning]);
 }
 
-// 닫힌 뒤 트리거로 포커스를 돌려준다. Modal이 완전히 사라진 뒤 부르는 onDismiss는 iOS와 웹에만 있어서,
-// Android는 visible이 true에서 false로 바뀔 때 보낸다.
-function useReturnFocus(visible: boolean, triggerRef?: RefObject<View | null>): () => void {
+// 닫힌 뒤 트리거로 포커스를 돌려주고 onClosed를 부른다. Modal이 완전히 사라진 뒤 부르는 onDismiss는
+// iOS와 웹에만 있어서, Android는 visible이 true에서 false로 바뀔 때 보낸다.
+function useAfterClose(
+  visible: boolean,
+  triggerRef?: RefObject<View | null>,
+  onClosed?: () => void,
+): () => void {
   const wasVisible = useRef(visible);
-  const returnFocus = () => {
+  const afterClose = () => {
     const trigger = triggerRef?.current;
     if (trigger) moveFocus(trigger);
+    onClosed?.();
   };
 
   useEffect(() => {
     const closed = wasVisible.current && !visible;
     wasVisible.current = visible;
-    if (closed && Platform.OS === 'android') returnFocus();
+    if (closed && Platform.OS === 'android') afterClose();
   });
 
-  return returnFocus;
+  return afterClose;
 }
 
 export function Sheet({
@@ -107,6 +104,7 @@ export function Sheet({
   actions,
   onClose,
   triggerRef,
+  onClosed,
 }: SheetProps): React.JSX.Element {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
@@ -114,7 +112,7 @@ export function Sheet({
   const titleId = useId();
   const titleRef = useRef<Text>(null);
   const firstActionRef = useRef<View>(null);
-  const returnFocus = useReturnFocus(visible, triggerRef);
+  const afterClose = useAfterClose(visible, triggerRef, onClosed);
   useDevWarnings(visible, kind, actions);
 
   const confirm = kind === 'confirm';
@@ -141,7 +139,7 @@ export function Sheet({
       navigationBarTranslucent
       onRequestClose={onClose}
       onShow={focusInside}
-      onDismiss={returnFocus}
+      onDismiss={afterClose}
     >
       {/* 가림막과 패널을 함께 감싼다. aria-modal은 형제를 VoiceOver에서 가리므로 패널에만 달면
           "메뉴 닫기" 가림막까지 가려진다. 자식 항목이 하나로 합쳐지지 않게 accessible은 주지 않고,
@@ -200,14 +198,14 @@ export function Sheet({
             const ref = index === focusIndex ? firstActionRef : undefined;
             const hint = action.destructive ? DESTRUCTIVE_HINT : undefined;
             // confirm의 주 동작은 primary, 되돌릴 수 없으면 danger, 취소는 ghost(캔버스 Settings-3, Trash-2, Trash-3).
+            // danger는 ghost에 글자만 danger 색이다(Trash-2의 "영구 삭제").
             return confirm ? (
               <Button
                 key={`${index}-${action.label}`}
                 ref={ref}
                 label={action.label}
-                variant={
-                  action.destructive ? 'danger' : action.role === 'cancel' ? 'ghost' : 'primary'
-                }
+                variant={confirmVariant(action)}
+                dangerText={!action.destructive && action.danger}
                 accessibilityHint={hint}
                 onPress={() => press(action)}
               />
