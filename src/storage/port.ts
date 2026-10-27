@@ -107,6 +107,8 @@ export interface PortTables {
     countByStudyDay(): Promise<{ study_day: number; count: number }[]>;
     /** 학습일별로 평가한 서로 다른 카드 수를 학습일 오름차순으로. 휴지통에 있는 카드의 이력도 센다. */
     countCardsByStudyDay(): Promise<{ study_day: number; count: number }[]>;
+    /** 평가와 힌트 사용 여부 조합별 평가 횟수. 순서는 정하지 않는다. 휴지통에 있는 카드의 이력도 센다. */
+    countByRating(): Promise<{ rating: ReviewRow['rating']; hint_used: boolean; count: number }[]>;
   };
   tombstones: {
     /** 같은 ID를 다시 받아도 한 행으로 남는다. */

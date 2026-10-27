@@ -41,6 +41,8 @@ export type Review = {
 
 export type ReviewDayCount = { studyDay: number; count: number };
 
+export type RatingCount = { rating: Rating; hintUsed: boolean; count: number };
+
 export type CardWithHistory = { card: Card; history: Review[] };
 
 export type Trash = {
@@ -168,6 +170,11 @@ export interface Store {
    * 휴지통 기준은 countReviewsByDay와 같다. 복습 달력이 이 값으로 진하기를 정한다.
    */
   countReviewedCardsByDay(): Promise<ReviewDayCount[]>;
+  /**
+   * 평가와 힌트 사용 여부 조합별 평가 횟수. 원본 평가 그대로이고, 힌트를 쓴 앎을 어떻게 셀지는 features/stats가 정한다.
+   * 휴지통 기준은 countReviewsByDay와 같다. 순서는 정하지 않는다.
+   */
+  countReviewsByRating(): Promise<RatingCount[]>;
   /** 카드가 살아 있지 않으면 거부한다. getCard와 같은 기준이다. */
   listReviewHistory(cardId: string): Promise<Review[]>;
 }
@@ -577,6 +584,14 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   async countReviewedCardsByDay() {
     return (await port.reviews.countCardsByStudyDay()).map(({ study_day, count }) => ({
       studyDay: study_day,
+      count,
+    }));
+  },
+
+  async countReviewsByRating() {
+    return (await port.reviews.countByRating()).map(({ rating, hint_used, count }) => ({
+      rating,
+      hintUsed: hint_used,
       count,
     }));
   },

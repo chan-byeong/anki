@@ -769,6 +769,35 @@ export const describeStoreContract = (
 
         expect(await store.countReviewedCardsByDay()).toEqual([]);
       });
+
+      test('평가와 힌트 사용 여부별 횟수를 원본 평가 그대로 세고, 휴지통의 카드 이력도 센다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const apple = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.rateCard(apple.id, { id: 'r1', rating: 'know', hintUsed: true });
+        await store.rateCard(apple.id, { id: 'r2', rating: 'know', hintUsed: false });
+        await store.rateCard(pear.id, { id: 'r3', rating: 'dont', hintUsed: false });
+        await store.rateCard(pear.id, { id: 'r4', rating: 'dont', hintUsed: false });
+        await store.trashCard(pear.id);
+
+        const counts = await store.countReviewsByRating();
+
+        expect(counts).toHaveLength(3);
+        expect(counts).toEqual(
+          expect.arrayContaining([
+            { rating: 'know', hintUsed: true, count: 1 },
+            { rating: 'know', hintUsed: false, count: 1 },
+            { rating: 'dont', hintUsed: false, count: 2 },
+          ]),
+        );
+      });
+
+      test('평가가 없으면 평가별 횟수도 빈 배열이다', async () => {
+        const { store } = await harness.open();
+
+        expect(await store.countReviewsByRating()).toEqual([]);
+      });
     });
   });
 };
