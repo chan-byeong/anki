@@ -5,12 +5,15 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { radius, size, space } from '@/theme/tokens';
 
 // 홈의 덱 한 줄. 캔버스에서 공통 컴포넌트로 묶지 않은 "덱 행"이라 화면 전용 조각으로 둔다.
-// 복습할 카드가 있으면 줄을 눌러 복습을 시작하고 끝의 버튼으로 덱 상세에 들어간다.
+// 이름 아래에 덱의 카드 수를 두고, 줄 끝에 메뉴 버튼을 둔다.
+// 복습할 카드가 있으면 줄을 눌러 복습을 시작한다.
 // 없으면 이름을 흐리게 하고 체크를 붙이며, 줄을 누르면 덱 상세로 간다.
 // 줄을 길게 누르면 여러 덱 선택 모드로 들어간다. 선택 모드에서는 앞에 체크 칸이 붙고, 줄을 누르면 덱 상세가 열린다.
 interface DeckRowProps {
   name: string;
   todayCount: number;
+  // 덱에 있는 카드 수. 오늘 복습이 끝나도 보인다.
+  cardCount: number;
   onStartReview: () => void;
   onOpenDeck: () => void;
   // 줄 끝 버튼이 여는 메뉴(덱 상세, 여러 덱 선택). 길게 누르기가 어려운 사용자의 진입 방법이다.
@@ -27,6 +30,7 @@ interface DeckRowProps {
 export function DeckRow({
   name,
   todayCount,
+  cardCount,
   onStartReview,
   onOpenDeck,
   onOpenMenu,
@@ -37,6 +41,17 @@ export function DeckRow({
 }: DeckRowProps) {
   const { colors, text } = useTheme();
   const done = todayCount === 0;
+  const total = `전체 ${cardCount}장`;
+  const sub = (
+    <Text style={[text('caption'), { color: colors.muted }]} numberOfLines={1}>
+      {`${cardCount}장`}
+    </Text>
+  );
+  const doneMark = (
+    <View style={styles.doneMark}>
+      <CheckIcon color={colors.muted} size={20} />
+    </View>
+  );
 
   if (selected !== undefined) {
     return (
@@ -64,23 +79,27 @@ export function DeckRow({
         )}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={done ? `${name} 열기, 오늘 복습 끝` : `${name} 열기`}
+          accessibilityLabel={
+            done ? `${name} 열기, 오늘 복습 끝, ${total}` : `${name} 열기, ${total}`
+          }
           onPress={onOpenDeck}
           style={({ pressed }) => [styles.main, { opacity: pressed ? 0.6 : 1 }]}
         >
-          <Text
-            style={[
-              // 캔버스: 오늘 끝난 덱은 굵지 않은 muted, 선택하지 않은 덱은 굵은 muted다.
-              text('body', { weight: done ? 'regular' : 'bold' }),
-              styles.name,
-              done || !selected ? { color: colors.muted } : null,
-            ]}
-            numberOfLines={1}
-          >
-            {name}
-          </Text>
+          <View style={styles.text}>
+            <Text
+              style={[
+                // 캔버스: 오늘 끝난 덱은 굵지 않은 muted, 선택하지 않은 덱은 굵은 muted다.
+                text('body', { weight: done ? 'regular' : 'bold' }),
+                done || !selected ? { color: colors.muted } : null,
+              ]}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            {sub}
+          </View>
           {done ? (
-            <CheckIcon color={colors.muted} size={20} />
+            doneMark
           ) : (
             <Text
               style={[
@@ -102,7 +121,9 @@ export function DeckRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          done ? `${name} 덱 상세, 오늘 복습 끝` : `${name} 복습 시작, ${todayCount}장`
+          done
+            ? `${name} 덱 상세, 오늘 복습 끝, ${total}`
+            : `${name} 복습 시작, ${todayCount}장, ${total}`
         }
         onPress={done ? onOpenDeck : onStartReview}
         onLongPress={done ? undefined : onEnterSelect}
@@ -115,29 +136,27 @@ export function DeckRow({
         }}
         style={({ pressed }) => [styles.main, { opacity: pressed ? 0.6 : 1 }]}
       >
+        <View style={styles.text}>
+          <Text
+            style={[
+              text('body', { weight: done ? 'regular' : 'bold' }),
+              done ? { color: colors.muted } : null,
+            ]}
+            numberOfLines={1}
+          >
+            {name}
+          </Text>
+          {sub}
+        </View>
         {done ? (
-          <>
-            <Text style={[text('body'), styles.name, { color: colors.muted }]} numberOfLines={1}>
-              {name}
-            </Text>
-            <CheckIcon color={colors.muted} size={20} />
-          </>
+          doneMark
         ) : (
-          <>
-            <Text style={[text('body', { weight: 'bold' }), styles.name]} numberOfLines={1}>
-              {name}
-            </Text>
-            <Text style={[text('body', { weight: 'bold' }), styles.count]}>{todayCount}</Text>
-          </>
+          <Text style={[text('body', { weight: 'bold' }), styles.count]}>{todayCount}</Text>
         )}
       </Pressable>
-      {done ? (
-        <View style={styles.spacer} />
-      ) : (
-        <View style={styles.trailing}>
-          <IconButton icon={MoreIcon} tone="muted" label={`${name} 메뉴`} onPress={onOpenMenu} />
-        </View>
-      )}
+      <View style={styles.trailing}>
+        <IconButton icon={MoreIcon} tone="muted" label={`${name} 메뉴`} onPress={onOpenMenu} />
+      </View>
     </View>
   );
 }
@@ -152,10 +171,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space[3],
   },
-  name: { flexShrink: 1 },
+  text: { flexShrink: 1 },
   count: { fontVariant: ['tabular-nums'] },
+  // 체크 그림은 24 격자에서 오른쪽 4만큼 비어 있다. 그만큼 당겨 체크 끝을 다른 줄의 숫자 끝과 맞춘다.
+  doneMark: { marginRight: -(20 / 24) * 4 },
   trailing: { marginRight: -size.edgeIcon },
-  spacer: { width: size.touch },
   // 체크 칸은 줄의 왼쪽 여백(edgeIcon)만큼 바깥으로 당겨 이름 글자가 일반 줄과 맞게 한다.
   check: {
     width: size.touch,

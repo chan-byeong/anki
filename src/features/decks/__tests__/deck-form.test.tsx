@@ -49,7 +49,7 @@ const setupUser = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTim
 
 const openEdit = async (name: string) => {
   const user = setupUser();
-  await user.press(screen.getByRole('button', { name: `${name} 덱 상세, 오늘 복습 끝` }));
+  await user.press(screen.getByRole('button', { name: `${name} 덱 상세, 오늘 복습 끝, 전체 0장` }));
   await user.press(await screen.findByRole('button', { name: '덱 메뉴' }));
   await user.press(screen.getByRole('button', { name: '덱 편집' }));
   await screen.findByLabelText('이름');
@@ -77,7 +77,7 @@ describe('덱 폼', () => {
     await user.press(screen.getByRole('button', { name: '만들기' }));
 
     expect(
-      await screen.findByRole('button', { name: '새 덱 덱 상세, 오늘 복습 끝' }),
+      await screen.findByRole('button', { name: '새 덱 덱 상세, 오늘 복습 끝, 전체 0장' }),
     ).toBeOnTheScreen();
     expect(await store.listDecks()).toMatchObject([{ name: '새 덱', language }]);
   });
@@ -111,7 +111,7 @@ describe('덱 폼', () => {
       await user.press(screen.getByRole('button', { name: '닫기' }));
       await user.press(await screen.findByRole('button', { name: '덱 목록으로' }));
       expect(
-        await screen.findByRole('button', { name: '고친 덱 덱 상세, 오늘 복습 끝' }),
+        await screen.findByRole('button', { name: '고친 덱 덱 상세, 오늘 복습 끝, 전체 0장' }),
       ).toBeOnTheScreen();
       expect(await store.getDeck(deck.id)).toMatchObject({ name: '고친 덱', language: null });
     },

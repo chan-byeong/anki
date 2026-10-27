@@ -142,11 +142,12 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
       ) : null}
       <ScrollView style={styles.fill} contentContainerStyle={styles.list}>
         <View accessibilityRole="list" accessibilityLabel="덱 목록">
-          {items.map(({ deck, todayCount }, index) => (
+          {items.map(({ deck, todayCount, cardCount }, index) => (
             <DeckRow
               key={deck.id}
               name={deck.name}
               todayCount={todayCount}
+              cardCount={cardCount}
               onStartReview={() =>
                 router.push({ pathname: '/review/[deckId]', params: { deckId: deck.id } })
               }

@@ -128,6 +128,8 @@ export interface Store {
    * 덱이 없거나 휴지통에 있으면 거부한다.
    */
   listCardsWithHistory(deckId: string): Promise<CardWithHistory[]>;
+  /** 살아 있는 덱마다 살아 있는 카드 수(덱 목록의 "320장"). 카드가 없는 덱은 0이다. */
+  countCardsByDeck(): Promise<Record<string, number>>;
   updateCard(cardId: string, patch: CardPatch): Promise<Card>;
   trashCard(cardId: string): Promise<void>;
 
@@ -485,6 +487,13 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
         decks: trashedDecks,
         cards: cards.map((row) => toTrashed(row, toCard)),
       };
+    });
+  },
+
+  async countCardsByDeck() {
+    return port.transaction(async (tx) => {
+      const decks = await tx.decks.listAlive();
+      return tx.cards.countAliveByDecks(decks.map(({ id }) => id));
     });
   },
 

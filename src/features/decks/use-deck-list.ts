@@ -10,6 +10,8 @@ export interface DeckListItem {
   deck: Deck;
   /** 오늘 복습할 카드 수. */
   todayCount: number;
+  /** 덱에 있는 카드 수. 휴지통에 넣은 카드는 세지 않는다. */
+  cardCount: number;
 }
 
 export type DeckListState =
@@ -27,12 +29,16 @@ export function useDeckList(): DeckListState {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      Promise.all([store.listDecks(), todayCountOf(store)]).then(
-        ([decks, counts]) => {
+      Promise.all([store.listDecks(), todayCountOf(store), store.countCardsByDeck()]).then(
+        ([decks, todayCounts, cardCounts]) => {
           if (!active) return;
           setState({
             kind: 'ready',
-            items: decks.map((deck) => ({ deck, todayCount: counts[deck.id] ?? 0 })),
+            items: decks.map((deck) => ({
+              deck,
+              todayCount: todayCounts[deck.id] ?? 0,
+              cardCount: cardCounts[deck.id] ?? 0,
+            })),
           });
         },
         () => {
