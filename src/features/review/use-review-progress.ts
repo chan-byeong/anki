@@ -4,6 +4,9 @@ import { useRef, useState } from 'react';
 import { createNextCardAfterRating } from '@/features/review/next-card-after-rating';
 import type { Card, RateInput, Rating, Review } from '@/storage/store';
 import { useStore } from '@/storage/StoreProvider';
+import { motion } from '@/theme/tokens';
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface ReviewProgress {
   card: Card | null;
@@ -39,12 +42,15 @@ export function useReviewProgress(cards: Card[]): UseReviewProgress {
     busy.current = true;
     setSaving(true);
     setPendingRating(rating);
+    // 고른 평가 버튼이 뒤집힌 모습을 보일 시간. 저장은 기다리지 않고 바로 시작한다(STA-152).
+    const shown = wait(motion);
     try {
       request.current ??= { input: { id: Crypto.randomUUID(), rating, hintUsed } };
       const attempt = request.current;
       attempt.review ??= await store.rateCard(progress.card.id, attempt.input);
       const next = await nextCardAfterRating(attempt.review);
       const recordedRating = attempt.review.rating;
+      await shown;
       setProgress((current) => ({ ...next, ratings: [...current.ratings, recordedRating] }));
       request.current = null;
       setPendingRating(null);

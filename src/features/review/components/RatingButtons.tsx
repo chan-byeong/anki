@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { RatingMark } from '@/components';
+import { RatingMark, ratingColor } from '@/components';
 import { RATINGS } from '@/features/review/components/ratings';
 import type { Rating } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -24,19 +24,32 @@ export function RatingButtons({
     <View role="group" accessibilityLabel="평가" style={styles.ratings}>
       {RATINGS.map(({ kind, label, rating }) => {
         const disabled = allDisabled || (pendingRating !== null && pendingRating !== rating);
+        // 고른 평가는 다음 카드로 넘어갈 때까지 배경을 평가색으로, 마크를 반전색으로 뒤집는다(STA-152).
+        const selected = pendingRating === rating;
         return (
           <Pressable
             key={kind}
             accessibilityRole="button"
             accessibilityLabel={label}
-            accessibilityState={{ disabled }}
+            accessibilityState={{ disabled, selected }}
             disabled={disabled}
             onPress={() => onRate(rating)}
-            style={[styles.rating, { backgroundColor: colors.surface }]}
+            style={({ pressed }) => [
+              styles.rating,
+              {
+                backgroundColor: pressed || selected ? ratingColor(colors, kind) : colors.surface,
+              },
+            ]}
           >
-            <View aria-hidden>
-              <RatingMark kind={kind} size={size.ratingMark} />
-            </View>
+            {({ pressed }) => (
+              <View aria-hidden>
+                <RatingMark
+                  kind={kind}
+                  size={size.ratingMark}
+                  color={pressed || selected ? colors.inverse : undefined}
+                />
+              </View>
+            )}
           </Pressable>
         );
       })}

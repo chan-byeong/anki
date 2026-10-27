@@ -1,4 +1,4 @@
-import { userEvent, within } from '@testing-library/react-native';
+import { fireEvent, userEvent, within } from '@testing-library/react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 import { AccessibilityInfo, Text } from 'react-native';
@@ -174,6 +174,74 @@ describe('복습 화면: 평가', () => {
   });
 });
 
+describe('복습 화면: 평가 버튼 반응', () => {
+  test('누른 평가는 다음 카드로 넘어가기 전까지 선택된 채 평가색 배경으로 뒤집힌다', async () => {
+    const { store, deck } = await seed();
+    // 저장이 끝나지 않게 붙잡아 다음 카드로 넘어가기 전 모습을 본다.
+    const save = jest.spyOn(store, 'rateCard').mockImplementation(() => new Promise(() => {}));
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: '정답 확인' }));
+    await user.press(screen.getByRole('button', { name: '앎' }));
+
+    const knew = screen.getByRole('button', { name: '앎' });
+    expect(knew.props.accessibilityState).toMatchObject({ selected: true });
+    expect(knew).toHaveStyle({ backgroundColor: '#1E7A4C' });
+    for (const name of ['모름', '헷갈림']) {
+      const other = screen.getByRole('button', { name });
+      expect(other.props.accessibilityState).toMatchObject({ selected: false, disabled: true });
+      expect(other).toHaveStyle({ backgroundColor: '#F4F4F5' });
+    }
+    save.mockRestore();
+  });
+});
+
+describe('복습 화면: 앞면 자리', () => {
+  // 스크롤 영역 500, 앞면 44, 위아래 기본 여백 40 + 24 → 앞면 위 여백 (500 - 64 - 44) / 2 = 196
+  const layOut = async () => {
+    await fireEvent(screen.getByTestId('review-scroll'), 'layout', {
+      nativeEvent: { layout: { height: 500 } },
+    });
+    await fireEvent(screen.getByLabelText('앞면 apple'), 'layout', {
+      nativeEvent: { layout: { height: 44 } },
+    });
+  };
+
+  test('정답을 열거나 메모·힌트를 펼쳐도 앞면은 처음 가운데 자리에 머문다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(deck.id, {
+      front: 'apple',
+      back: '사과',
+      hint: '빨간 과일',
+      memo: 'an apple a day',
+    });
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+    await layOut();
+
+    const front = () => screen.getByLabelText('앞면 apple');
+    expect(front()).toHaveStyle({ marginTop: 196 });
+
+    await user.press(screen.getByRole('button', { name: '힌트 열기' }));
+    await user.press(screen.getByRole('button', { name: '메모 열기' }));
+    // 펼친 칸은 카드 위에 겹쳐 뜨고, 그 높이만큼 본문 아래 여백만 는다.
+    await fireEvent(screen.getByTestId('review-extras'), 'layout', {
+      nativeEvent: { layout: { height: 240 } },
+    });
+    expect(front()).toHaveStyle({ marginTop: 196 });
+    expect(screen.getByTestId('review-extras')).toHaveStyle({ position: 'absolute' });
+    expect(screen.getByTestId('review-scroll').props.contentContainerStyle).toContainEqual({
+      paddingBottom: 24 + 240,
+    });
+
+    await user.press(screen.getByRole('button', { name: '정답 확인' }));
+    expect(screen.getByText('사과')).toBeOnTheScreen();
+    expect(front()).toHaveStyle({ marginTop: 196 });
+  });
+});
+
 describe('복습 화면: 복습 끝', () => {
   test.each<ThemeName>(['light', 'dark'])(
     '%s: 마지막 평가 후 이번에 본 카드 수·평가 결과를 보여 주고 홈으로 간다',
@@ -186,7 +254,7 @@ describe('복습 화면: 복습 끝', () => {
 
       for (const name of ['모름', '헷갈림', '앎', '앎']) {
         expect(screen.queryByRole('header', { name: '오늘 복습 끝' })).toBeNull();
-        await user.press(screen.getByRole('button', { name: '정답 확인' }));
+        await user.press(await screen.findByRole('button', { name: '정답 확인' }));
         await user.press(screen.getByRole('button', { name }));
       }
 

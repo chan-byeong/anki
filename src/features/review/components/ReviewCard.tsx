@@ -1,15 +1,31 @@
 import { useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { HintIcon, IconButton, MemoIcon } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import { RatingButtons } from '@/features/review/components/RatingButtons';
+import { useFrontAnchor } from '@/features/review/use-front-anchor';
 import { useHand } from '@/features/settings/HandProvider';
 import type { Card, Rating } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, size, space } from '@/theme/tokens';
 
 // 복습 중인 카드 한 장. 앞면을 먼저 보이고, 카드를 누르면 뒷면(정답)과 평가 버튼을 연다.
+
+// 카드 높이 상한(세로 = 가로 × 3/2). 화면이 길어도 카드 아래쪽 메모·힌트 버튼이 엄지가 닿는 높이에 머문다(STA-152).
+// 남는 높이는 카드와 평가 줄 사이 빈 곳이 된다.
+const CARD_ASPECT = 3 / 2;
+// 스크롤 영역의 위아래 기본 여백. 앞면은 이 여백을 뺀 높이의 가운데에 선다.
+const CONTENT_TOP = space[5];
+const CONTENT_BOTTOM = space[4];
 interface ReviewCardProps {
   card: Card;
   insetBottom: number;
@@ -26,6 +42,11 @@ export function ReviewCard({
   pendingRating,
 }: ReviewCardProps) {
   const { colors, text } = useTheme();
+  const { width } = useWindowDimensions();
+  const cardMaxHeight = (width - space[4] * 2) * CARD_ASPECT;
+  const anchor = useFrontAnchor(CONTENT_TOP + CONTENT_BOTTOM);
+  // 겹쳐 뜬 메모·힌트 칸과 아이콘 줄의 높이. 그만큼 본문 아래 여백을 둬 가려진 내용도 스크롤로 볼 수 있다.
+  const [extrasHeight, setExtrasHeight] = useState(0);
   const deckName = useDeckName(card.deckId);
   // 힌트·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
   const { hand } = useHand();
@@ -37,9 +58,6 @@ export function ReviewCard({
   const [hintUsed, setHintUsed] = useState(false);
   const hintShown = card.hint !== null && hintOpen;
   const memoShown = card.memo !== null && memoOpen;
-  // 캔버스(Review-1): 펼친 칸이 없고 정답을 열기 전에는 아이콘 줄이 카드 위에 떠 있어 앞면이 카드 전체의 가운데에 온다.
-  // 칸을 펼치거나 정답을 열면 흐름 안에 놓인다(Review-2, Review-3).
-  const extrasFloat = !revealed && !hintShown && !memoShown;
   const frontId = `review-front-${card.id}`;
 
   const reveal = () => {
@@ -56,7 +74,7 @@ export function ReviewCard({
   return (
     <>
       <View style={styles.main}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+        <View style={[styles.card, { maxHeight: cardMaxHeight, backgroundColor: colors.surface }]}>
           {/* 공개 전후로 같은 요소를 유지한다. 감싸는 요소가 바뀌면 스크롤 영역이 다시 만들어져 읽던 위치가 사라진다. */}
           <Pressable
             // 카드 전체가 버튼이다. 스크롤은 그대로 되고, 짧게 누르면 열린다.
@@ -72,8 +90,23 @@ export function ReviewCard({
             onPress={reveal}
             style={styles.front}
           >
-            <ScrollView testID="review-scroll" contentContainerStyle={styles.content}>
-              <View accessible accessibilityLabel={`앞면 ${card.front}`}>
+            <ScrollView
+              testID="review-scroll"
+              onLayout={anchor.onViewportLayout}
+              contentContainerStyle={[
+                styles.content,
+                // 재기 전에는 가운데 정렬, 잰 뒤에는 그 자리를 위 여백으로 굳힌다. 정답이 붙거나 칸이 열려도 앞면이 움직이지 않는다.
+                anchor.offset === null
+                  ? styles.contentCentered
+                  : { paddingBottom: CONTENT_BOTTOM + extrasHeight },
+              ]}
+            >
+              <View
+                accessible
+                accessibilityLabel={`앞면 ${card.front}`}
+                onLayout={anchor.onFrontLayout}
+                style={anchor.offset === null ? undefined : { marginTop: anchor.offset }}
+              >
                 <Text
                   nativeID={frontId}
                   style={[text('display', { weight: 'bold' }), styles.center]}
@@ -102,10 +135,13 @@ export function ReviewCard({
           </Pressable>
           {card.hint !== null || card.memo !== null ? (
             <View
-              style={[styles.extras, extrasFloat ? styles.extrasFloating : null]}
+              testID="review-extras"
+              style={styles.extras}
               pointerEvents="box-none"
+              onLayout={(event) => setExtrasHeight(event.nativeEvent.layout.height)}
             >
-              {/* 캔버스에는 메모 칸(Review-2)만 있어 힌트 칸도 같은 모양으로 둔다. */}
+              {/* 칸은 카드 아래쪽에 겹쳐 뜬다. 흐름 안에 두면 열 때마다 앞면이 위로 밀린다(STA-152).
+                  캔버스에는 메모 칸(Review-2)만 있어 힌트 칸도 같은 모양으로 둔다. */}
               {hintShown ? (
                 <View
                   role="region"
@@ -185,9 +221,16 @@ const styles = StyleSheet.create({
   main: { flex: 1, minHeight: 0, paddingTop: space[2], paddingHorizontal: space[4] },
   card: { flex: 1, borderRadius: radius.lg, overflow: 'hidden' },
   front: { flex: 1 },
-  extras: { paddingHorizontal: space[2], paddingBottom: space[2], gap: space[2] },
+  extras: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: space[2],
+    paddingBottom: space[2],
+    gap: space[2],
+  },
   panel: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
-  extrasFloating: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // 캔버스의 아이콘 세로 줄(간격 space-3)에 힌트 버튼을 메모 버튼 위에 더한다.
   // 캔버스(Review-1~3의 hand)는 줄을 손 쪽 모서리에 두고 메모 버튼만 그쪽으로 space-4 띄운다.
   // 그 아래 붙는 발음 버튼이 아직 없어 줄 전체에 띄웠다. 발음 버튼을 더할 때 이 여백을 메모·힌트 버튼으로 옮긴다.
@@ -198,11 +241,11 @@ const styles = StyleSheet.create({
   deck: { position: 'absolute', top: space[3], left: space[4] },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: space[4],
-    paddingTop: space[5],
-    paddingBottom: space[4],
+    paddingTop: CONTENT_TOP,
+    paddingBottom: CONTENT_BOTTOM,
   },
+  contentCentered: { justifyContent: 'center' },
   answer: { marginTop: space[4], gap: space[4] },
   center: { textAlign: 'center' },
   divider: { alignSelf: 'center', width: 32, height: 1 },
