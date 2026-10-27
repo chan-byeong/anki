@@ -6,11 +6,11 @@ import {
 } from '@expo-google-fonts/noto-sans-kr';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import Storage from 'expo-sqlite/kv-store';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 
 import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
+import { kvStore } from '@/storage/kv-store';
 import { openAppStore } from '@/storage/open-app-store';
 import type { Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
@@ -72,7 +72,7 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <ThemeProvider storage={Storage}>
+    <ThemeProvider storage={kvStore}>
       {storeState.kind === 'open' ? (
         <StoreProvider store={storeState.store}>
           <ThemedStack />
