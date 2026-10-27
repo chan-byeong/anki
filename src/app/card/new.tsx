@@ -109,7 +109,7 @@ export default function NewCardScreen() {
           label="힌트"
           optional
           multiline
-          placeholder="정답을 떠올릴 단서"
+          placeholder="첫 글자, 떠오르게 하는 말"
           value={hint}
           onChangeText={setHint}
         />
