@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 
+import { HandProvider } from '@/features/settings/HandProvider';
 import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
 import { kvStore } from '@/storage/kv-store';
 import { openAppStore } from '@/storage/open-app-store';
@@ -73,13 +74,15 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider storage={kvStore}>
-      {storeState.kind === 'open' ? (
-        <StoreProvider store={storeState.store}>
-          <ThemedStack />
-        </StoreProvider>
-      ) : (
-        <StorageErrorScreen onRetry={retry} retrying={retrying} />
-      )}
+      <HandProvider storage={kvStore}>
+        {storeState.kind === 'open' ? (
+          <StoreProvider store={storeState.store}>
+            <ThemedStack />
+          </StoreProvider>
+        ) : (
+          <StorageErrorScreen onRetry={retry} retrying={retrying} />
+        )}
+      </HandProvider>
     </ThemeProvider>
   );
 }

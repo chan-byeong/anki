@@ -3,6 +3,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ListRow, ListSection, PageHeader, Segmented, TopBar } from '@/components';
+import type { Hand } from '@/features/settings/hand-preference';
+import { useHand } from '@/features/settings/HandProvider';
 import { useTrashCount } from '@/features/trash/use-trash-count';
 import { useTheme } from '@/theme/ThemeProvider';
 import type { ThemePreference } from '@/theme/theme-preference';
@@ -15,9 +17,15 @@ const THEME_OPTIONS: readonly { value: ThemePreference; label: string }[] = [
   { value: 'dark', label: '다크' },
 ];
 
-// 설정(Settings-1). 화면의 테마와 자료의 휴지통이 있다. 계정, 동기화, 주로 쓰는 손은 각 티켓에서 더한다.
+const HAND_OPTIONS: readonly { value: Hand; label: string }[] = [
+  { value: 'left', label: '왼손' },
+  { value: 'right', label: '오른손' },
+];
+
+// 설정(Settings-1). 화면의 테마·주로 쓰는 손과 자료의 휴지통이 있다. 계정, 동기화는 각 티켓에서 더한다.
 export default function SettingsScreen() {
   const { colors, text, preference, setPreference } = useTheme();
+  const { hand, setHand } = useHand();
   const insets = useSafeAreaInsets();
   const trashCount = useTrashCount();
   // 개수를 읽기 전에는 숫자 없이 행만 보인다. "0"이 잠깐 보였다 바뀌지 않게 하기 위해서다.
@@ -37,6 +45,19 @@ export default function SettingsScreen() {
               options={THEME_OPTIONS}
               value={preference}
               onChange={setPreference}
+            />
+          </View>
+          <View style={styles.setting}>
+            <View style={styles.settingName}>
+              <Text style={text('body')}>주로 쓰는 손</Text>
+              <Text style={[text('caption'), { color: colors.muted }]}>복습 버튼 위치</Text>
+            </View>
+            <Segmented
+              label="주로 쓰는 손"
+              width={160}
+              options={HAND_OPTIONS}
+              value={hand}
+              onChange={setHand}
             />
           </View>
         </ListSection>
@@ -67,4 +88,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space[3],
   },
+  settingName: { flexShrink: 1, minWidth: 0 },
 });
