@@ -74,3 +74,9 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 ### Design
 
 UI follows the "Anki 디자인" Claude Design canvas. Read it before building or changing any screen or component. See `docs/agents/design.md`.
+
+Before writing or changing any UI code (screens, components, spacing, colors, icons, labels):
+
+1. Read the artboards for that screen and its states, plus `tokens.css` and `components.css` (steps in `docs/agents/design.md`). Do this even when a similar component already exists; don't build from memory or from existing code alone.
+2. Match the canvas: layout, spacing, sizes, weights, icons, labels. Where the canvas has no artboard for something you must add, or you deviate, say so in the PR body.
+3. In the PR body, list the artboards you read. Never claim a UI matches the canvas for an artboard you did not read.
