@@ -741,6 +741,34 @@ export const describeStoreContract = (
 
         expect(await store.countReviewsByDay()).toEqual([]);
       });
+
+      test('학습일별로 평가한 서로 다른 카드 수를 세고, 같은 날 여러 번 평가한 카드는 하나로 센다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const apple = await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const pear = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        const rate = (cardId: string, id: string, at: Date) => {
+          harness.clock.set(at.getTime());
+          return store.rateCard(cardId, { id, rating: 'dont', hintUsed: false });
+        };
+        await rate(apple.id, 'r1', new Date(2026, 0, 2, 9));
+        await rate(apple.id, 'r2', new Date(2026, 0, 2, 9, 5));
+        await rate(apple.id, 'r3', new Date(2026, 0, 2, 9, 10));
+        await rate(pear.id, 'r4', new Date(2026, 0, 2, 9, 1));
+        await rate(pear.id, 'r5', new Date(2026, 0, 1, 9));
+        await store.trashCard(pear.id);
+
+        expect(await store.countReviewedCardsByDay()).toEqual([
+          { studyDay: 20454, count: 1 },
+          { studyDay: 20455, count: 2 },
+        ]);
+      });
+
+      test('평가한 카드가 없으면 빈 배열이다', async () => {
+        const { store } = await harness.open();
+
+        expect(await store.countReviewedCardsByDay()).toEqual([]);
+      });
     });
   });
 };

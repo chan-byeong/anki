@@ -163,6 +163,11 @@ export interface Store {
    * 연속 복습일 같은 통계는 `features/stats`가 이 값으로 계산한다(ADR 0010).
    */
   countReviewsByDay(): Promise<ReviewDayCount[]>;
+  /**
+   * 학습일별로 평가한 서로 다른 카드 수를 학습일 순서로. 같은 날 재등장으로 여러 번 평가한 카드는 하나로 센다.
+   * 휴지통 기준은 countReviewsByDay와 같다. 복습 달력이 이 값으로 진하기를 정한다.
+   */
+  countReviewedCardsByDay(): Promise<ReviewDayCount[]>;
   /** 카드가 살아 있지 않으면 거부한다. getCard와 같은 기준이다. */
   listReviewHistory(cardId: string): Promise<Review[]>;
 }
@@ -564,6 +569,13 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
 
   async countReviewsByDay() {
     return (await port.reviews.countByStudyDay()).map(({ study_day, count }) => ({
+      studyDay: study_day,
+      count,
+    }));
+  },
+
+  async countReviewedCardsByDay() {
+    return (await port.reviews.countCardsByStudyDay()).map(({ study_day, count }) => ({
       studyDay: study_day,
       count,
     }));

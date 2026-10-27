@@ -113,6 +113,15 @@ const tablesOn = (db: MemoryBacking): PortTables => ({
         .map(([study_day, count]) => ({ study_day, count }))
         .sort((a, b) => a.study_day - b.study_day);
     },
+    countCardsByStudyDay: async () => {
+      const cards = new Map<number, Set<string>>();
+      for (const { study_day, card_id } of db.reviews.values()) {
+        cards.set(study_day, (cards.get(study_day) ?? new Set()).add(card_id));
+      }
+      return [...cards]
+        .map(([study_day, ids]) => ({ study_day, count: ids.size }))
+        .sort((a, b) => a.study_day - b.study_day);
+    },
   },
   tombstones: {
     put: async (row) => {
