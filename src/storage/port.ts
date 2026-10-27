@@ -105,6 +105,8 @@ export interface PortTables {
     listByCard(cardId: string): Promise<ReviewRow[]>;
     /** 학습일별 평가 횟수를 학습일 오름차순으로. 휴지통에 있는 카드의 이력도 센다. */
     countByStudyDay(): Promise<{ study_day: number; count: number }[]>;
+    /** 학습일별로 평가한 서로 다른 카드 수를 학습일 오름차순으로. 휴지통에 있는 카드의 이력도 센다. */
+    countCardsByStudyDay(): Promise<{ study_day: number; count: number }[]>;
   };
   tombstones: {
     /** 같은 ID를 다시 받아도 한 행으로 남는다. */
