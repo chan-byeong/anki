@@ -178,6 +178,12 @@ const tablesOn = (db: SqlExecutor): PortTables => ({
           'SELECT study_day, COUNT(DISTINCT card_id) AS count FROM reviews GROUP BY study_day ORDER BY study_day',
         ),
       ),
+    countByRating: async () =>
+      (
+        await db.all<{ rating: ReviewRow['rating']; hint_used: 0 | 1; count: number }>(
+          'SELECT rating, hint_used, COUNT(*) AS count FROM reviews GROUP BY rating, hint_used',
+        )
+      ).map(({ rating, hint_used, count }) => ({ rating, hint_used: hint_used === 1, count })),
   },
   tombstones: {
     put: async (row) => {
