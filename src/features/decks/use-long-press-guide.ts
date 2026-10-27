@@ -1,9 +1,10 @@
-import Storage from 'expo-sqlite/kv-store';
 import { useEffect, useRef, useState } from 'react';
+
+import { kvStore } from '@/storage/kv-store';
 
 import { createLongPressGuide } from './long-press-guide';
 
-const guide = createLongPressGuide(Storage);
+const guide = createLongPressGuide(kvStore);
 
 // 덱 목록에 들어올 때 안내를 보일지 정한다. enabled가 되면(보여 줄 만한 목록이 생기면) 화면당 한 번만 센다.
 // 목록을 다시 읽어 enabled가 오르내려도 다시 세지 않는다.
