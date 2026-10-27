@@ -23,7 +23,7 @@ export const byStudyOrder = (a: Review, b: Review): number => {
 };
 
 // 힌트를 쓴 앎은 헷갈림으로 계산한다. 이력에는 원본 평가가 그대로 남는다(ADR 0004).
-export const effectiveRating = (review: Review): Rating =>
+export const effectiveRating = (review: Pick<Review, 'rating' | 'hintUsed'>): Rating =>
   review.rating === 'know' && review.hintUsed ? 'unsure' : review.rating;
 
 // 새 학습일의 첫 평가가 정하는 간격. elapsed는 직전 학습일에서 지난 일수(1 이상)다.

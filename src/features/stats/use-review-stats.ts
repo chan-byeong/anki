@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import { useStore } from '@/storage/StoreProvider';
 import { studyDayOf } from '@/utils/study-day';
 
+import { readForecast } from './forecast';
+import { ratingShare, type RatingShare } from './rating-share';
 import { calendarWeeks, type CalendarDay } from './review-calendar';
 import { reviewStreak, totalReviews } from './review-streak';
 
@@ -15,6 +17,8 @@ export type ReviewStatsState =
       total: number;
       today: number;
       calendar: (CalendarDay | null)[][];
+      ratings: { total: number; shares: RatingShare[] };
+      forecast: number[];
     }
   | { kind: 'failed' };
 
@@ -26,16 +30,23 @@ export function useReviewStats(): ReviewStatsState {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      Promise.all([store.countReviewsByDay(), store.countReviewedCardsByDay()]).then(
-        ([days, cardDays]) => {
+      const today = studyDayOf(Date.now());
+      Promise.all([
+        store.countReviewsByDay(),
+        store.countReviewedCardsByDay(),
+        store.countReviewsByRating(),
+        readForecast(store, today),
+      ]).then(
+        ([days, cardDays, ratings, forecast]) => {
           if (!active) return;
-          const today = studyDayOf(Date.now());
           setState({
             kind: 'ready',
             streak: reviewStreak(days, today),
             total: totalReviews(days),
             today,
             calendar: calendarWeeks(cardDays, today),
+            ratings: ratingShare(ratings),
+            forecast,
           });
         },
         () => {
