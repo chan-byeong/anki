@@ -420,6 +420,24 @@ export const describeStoreContract = (
       });
     });
 
+    describe('덱별 카드 수', () => {
+      test('살아 있는 덱마다 살아 있는 카드 수를 세고, 카드가 없는 덱은 0이다', async () => {
+        const { store } = await harness.open();
+        expect(await store.countCardsByDeck()).toEqual({});
+        const deck = await store.createDeck({ name: '영어 단어' });
+        await store.createCard(deck.id, { front: 'apple', back: '사과' });
+        const trashed = await store.createCard(deck.id, { front: 'pear', back: '배' });
+        await store.createCard(deck.id, { front: 'plum', back: '자두' });
+        const empty = await store.createDeck({ name: '빈 덱' });
+        const gone = await store.createDeck({ name: '개발 지식' });
+        await store.createCard(gone.id, { front: 'git', back: '버전 관리' });
+        await store.trashCard(trashed.id);
+        await store.trashDeck(gone.id);
+
+        expect(await store.countCardsByDeck()).toEqual({ [deck.id]: 2, [empty.id]: 0 });
+      });
+    });
+
     describe('동기화로 덱만 휴지통에 있는 카드', () => {
       // 다른 기기에서 덱을 휴지통에 넣는 사이 이 기기에서 카드를 되살린 상태를 포트로 직접 만든다.
       const openWithStrandedCard = async () => {
@@ -459,6 +477,7 @@ export const describeStoreContract = (
 
         expect((await store.listTrash()).cards).toEqual([]);
         expect(await store.countTrash()).toBe(1);
+        expect(await store.countCardsByDeck()).toEqual({});
 
         await store.restoreDeck(card.deckId);
 

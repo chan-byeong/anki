@@ -285,7 +285,7 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     await renderApp(store, '/');
     const user = setupUser();
 
-    await user.press(screen.getByRole('button', { name: '영어 단어 복습 시작, 2장' }));
+    await user.press(screen.getByRole('button', { name: '영어 단어 복습 시작, 2장, 전체 2장' }));
 
     expect(await screen.findByText('apple')).toBeOnTheScreen();
     expect(screen.queryByText('사과')).toBeNull();
@@ -410,7 +410,7 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     await renderApp(store, '/');
     const user = setupUser();
 
-    await user.press(screen.getByRole('button', { name: '영어 단어 복습 시작, 2장' }));
+    await user.press(screen.getByRole('button', { name: '영어 단어 복습 시작, 2장, 전체 2장' }));
     await user.press(await screen.findByRole('button', { name: '복습 닫기' }));
 
     expect(await screen.findByRole('header', { name: '덱' })).toBeOnTheScreen();

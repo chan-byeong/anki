@@ -82,6 +82,14 @@ const tablesOn = (db: MemoryBacking): PortTables => ({
           [...db.cards.values()].filter((row) => row.deleted_by_op === opId).length,
         ]),
       ),
+    countAliveByDecks: async (deckIds) =>
+      Object.fromEntries(
+        deckIds.map((deckId) => [
+          deckId,
+          [...db.cards.values()].filter((row) => row.deck_id === deckId && row.deleted_at === null)
+            .length,
+        ]),
+      ),
     remove: async (id) => {
       db.cards.delete(id);
       for (const review of [...db.reviews.values()]) {

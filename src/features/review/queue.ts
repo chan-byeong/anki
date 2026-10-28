@@ -1,4 +1,4 @@
-import type { Card, Store } from '@/storage/store';
+import type { Card, CardWithHistory, Store } from '@/storage/store';
 import { isInQueue } from './is-in-queue';
 import { scheduleCard } from './schedule-card';
 /** 난수로 섞은 사본. random은 [0, 1)을 돌려주는 함수다. */
@@ -26,14 +26,40 @@ export const listQueueOf: (
   for (const deckId of deckIds) {
     rows.push(...(await store.listCardsWithHistory(deckId)));
   }
-  // 섞은 뒤 안정 정렬해서 같은 키의 순서만 난수가 정한다. 신규 카드는 키가 가장 크다.
-  return shuffled(
+  return ordered(
     rows.filter((row) => isInQueue(row.history, today)),
     random,
-  )
+  );
+};
+
+/** 대기열 카드를 복습일이 오래된 순으로. 섞은 뒤 안정 정렬해서 같은 키의 순서만 난수가 정한다. 신규 카드는 키가 가장 크다. */
+const ordered = (rows: CardWithHistory[], random: () => number): Card[] =>
+  shuffled(rows, random)
     .map((row) => ({ card: row.card, dueDay: scheduleCard(row.history)?.dueDay ?? Infinity }))
     .sort((a, b) => (a.dueDay === b.dueDay ? 0 : a.dueDay < b.dueDay ? -1 : 1))
     .map(({ card }) => card);
+
+/**
+ * 복습을 시작할 때 보여 줄 카드. 오늘 대기열이 있는 덱은 listQueueOf와 같은 대기열을 쓰고,
+ * 오늘 대기열이 빈 덱(홈의 체크 표시)은 살아 있는 모든 카드를 random으로 섞어 쓴다.
+ * 대기열 카드가 먼저, 모든 카드가 그 뒤에 온다. 평가는 평소처럼 학습 이력에 남는다.
+ * 덱이 하나라도 없거나 휴지통에 있으면 Store가 던진 오류를 그대로 던진다. today는 학습일이다.
+ */
+export const listReviewCardsOf: (
+  store: Store,
+  deckIds: string[],
+  today: number,
+  random?: () => number,
+) => Promise<Card[]> = async (store, deckIds, today, random = Math.random) => {
+  const due: CardWithHistory[] = [];
+  const all: Card[] = [];
+  for (const deckId of deckIds) {
+    const rows = await store.listCardsWithHistory(deckId);
+    const queue = rows.filter((row) => isInQueue(row.history, today));
+    if (queue.length > 0) due.push(...queue);
+    else all.push(...rows.map(({ card }) => card));
+  }
+  return [...ordered(due, random), ...shuffled(all, random)];
 };
 
 /** 한 덱의 오늘 대기열 카드. */

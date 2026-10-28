@@ -138,6 +138,17 @@ const tablesOn = (db: SqlExecutor): PortTables => ({
       for (const row of rows) counts[row.op] = row.total;
       return counts;
     },
+    countAliveByDecks: async (deckIds) => {
+      const counts: Record<string, number> = Object.fromEntries(deckIds.map((id) => [id, 0]));
+      if (deckIds.length === 0) return counts;
+      const marks = deckIds.map(() => '?').join(', ');
+      const rows = await db.all<{ deck: string; total: number }>(
+        `SELECT deck_id AS deck, COUNT(*) AS total FROM cards WHERE deleted_at IS NULL AND deck_id IN (${marks}) GROUP BY deck_id`,
+        deckIds,
+      );
+      for (const row of rows) counts[row.deck] = row.total;
+      return counts;
+    },
     remove: async (id) => {
       await db.run('DELETE FROM cards WHERE id = ?', [id]);
     },
