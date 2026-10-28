@@ -123,8 +123,7 @@ export const motionHold = 400;
 // 캔버스 Motion의 --toast-hold: 토스트가 머무는 시간. 보조 줄(sub)이 있으면 더 오래 둔다.
 export const toastHold = { plain: 3000, withSub: 4000 } as const;
 
-// 늦을 때만 기다림 표시: after가 지나야 띄우고, 띄우면 최소 min 동안 둔다.
-// 캔버스 토큰에는 없고 "한장 인터랙션 명세"의 시간과 곡선 표에만 있다.
+// 늦을 때만 기다림 표시(--slow-after, --slow-min): after가 지나야 띄우고, 띄우면 최소 min 동안 둔다.
 export const slow = { after: 300, min: 400 } as const;
 
 // 곡선. cubic-bezier(x1, y1, x2, y2)의 네 값이라 애니메이션 라이브러리와 무관하다.
