@@ -187,11 +187,12 @@ describe('복습 화면: 평가 버튼 반응', () => {
 
     const knew = screen.getByRole('button', { name: '앎' });
     expect(knew.props.accessibilityState).toMatchObject({ selected: true });
-    expect(knew).toHaveStyle({ backgroundColor: '#1E7A4C' });
+    // 배경은 누르면 줄어드는 안쪽 면에 칠한다.
+    expect(knew.children[0]).toHaveStyle({ backgroundColor: '#1E7A4C' });
     for (const name of ['모름', '헷갈림']) {
       const other = screen.getByRole('button', { name });
       expect(other.props.accessibilityState).toMatchObject({ selected: false, disabled: true });
-      expect(other).toHaveStyle({ backgroundColor: '#F4F4F5' });
+      expect(other.children[0]).toHaveStyle({ backgroundColor: '#F4F4F5' });
     }
     save.mockRestore();
   });

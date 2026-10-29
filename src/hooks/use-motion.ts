@@ -1,5 +1,13 @@
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
-import { motion, motionEnter, motionPress, pressScale, shift, shiftCard } from '@/theme/tokens';
+import {
+  motion,
+  motionEnter,
+  motionPress,
+  pickScale,
+  pressScale,
+  shift,
+  shiftCard,
+} from '@/theme/tokens';
 
 export interface Motion {
   reduced: boolean;
@@ -7,6 +15,7 @@ export interface Motion {
   motion: number;
   enter: number;
   pressScale: number;
+  pickScale: number;
   shift: number;
   shiftCard: number;
 }
@@ -17,6 +26,7 @@ const FULL: Motion = {
   motion,
   enter: motionEnter,
   pressScale,
+  pickScale,
   shift,
   shiftCard,
 };
@@ -29,6 +39,7 @@ const REDUCED: Motion = {
   motion,
   enter: motion,
   pressScale: 1,
+  pickScale: 1,
   shift: 0,
   shiftCard: 0,
 };

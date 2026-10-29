@@ -1,7 +1,10 @@
 import type { Ref } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import Animated, { interpolate, useAnimatedStyle } from 'react-native-reanimated';
 
-import { radius, size as sizeToken, space } from '../theme/tokens';
+import { useMotion } from '../hooks/use-motion';
+import { usePressProgress } from '../hooks/use-press-progress';
+import { pressOpacity, radius, size as sizeToken, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { A11yLabelProps, A11yRoleProps, A11yStateProps, InheritedA11yProps } from './a11y';
 import type { IconComponent } from './icons';
@@ -41,6 +44,14 @@ export function Button({
   ...a11y
 }: ButtonProps) {
   const { colors, text } = useTheme();
+  const { pressScale } = useMotion();
+  const { progress, onPressIn, onPressOut } = usePressProgress();
+  // 누르는 동안 줄어들고, 주 버튼은 조금 옅어진다. 비활성이면 Pressable이 누름을 받지 않는다.
+  const dimmed = variant === 'primary' ? pressOpacity : 1;
+  const pressStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 1], [1, dimmed]),
+    transform: [{ scale: interpolate(progress.value, [0, 1], [1, pressScale]) }],
+  }));
 
   const enabled = {
     primary: { bg: colors.text, fg: colors.inverse },
@@ -65,42 +76,49 @@ export function Button({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.base,
-        {
-          backgroundColor: palette.bg,
-          minHeight: height,
-          borderRadius: small ? radius.sm : radius.full,
-          opacity: pressed ? 0.7 : 1,
-        },
-        Icon
-          ? { width: sizeToken.button, minHeight: sizeToken.button }
-          : small
-            ? styles.compact
-            : styles.fill,
-      ]}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      // 누름 영역은 그대로 두고 안쪽 면만 줄인다.
+      style={Icon ? styles.iconBox : small ? styles.compactBox : styles.fillBox}
     >
-      {Icon ? (
-        <Icon color={palette.fg} />
-      ) : (
-        <View style={styles.content}>
-          <Text style={labelStyle}>{label}</Text>
-          {count ? (
-            <>
-              <Text style={[labelStyle, styles.sep]}>·</Text>
-              <Text style={labelStyle}>{count}</Text>
-            </>
-          ) : null}
-        </View>
-      )}
+      <Animated.View
+        style={[
+          styles.base,
+          {
+            backgroundColor: palette.bg,
+            minHeight: height,
+            borderRadius: small ? radius.sm : radius.full,
+          },
+          Icon ? styles.icon : small ? styles.compact : styles.fill,
+          pressStyle,
+        ]}
+      >
+        {Icon ? (
+          <Icon color={palette.fg} />
+        ) : (
+          <View style={styles.content}>
+            <Text style={labelStyle}>{label}</Text>
+            {count ? (
+              <>
+                <Text style={[labelStyle, styles.sep]}>·</Text>
+                <Text style={labelStyle}>{count}</Text>
+              </>
+            ) : null}
+          </View>
+        )}
+      </Animated.View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  fillBox: { alignSelf: 'stretch' },
+  compactBox: { alignSelf: 'flex-start' },
+  iconBox: { width: sizeToken.button },
   base: { alignItems: 'center', justifyContent: 'center' },
-  fill: { alignSelf: 'stretch', paddingHorizontal: space[4] },
-  compact: { alignSelf: 'flex-start', paddingHorizontal: space[3] },
+  fill: { paddingHorizontal: space[4] },
+  compact: { paddingHorizontal: space[3] },
+  icon: { width: sizeToken.button, minHeight: sizeToken.button },
   content: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   sep: { opacity: 0.6 },
 });

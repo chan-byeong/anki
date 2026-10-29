@@ -138,6 +138,10 @@ export const easeMove: Bezier = [0.4, 0, 0.2, 1];
 // 거리. 동작 줄이기에서는 useMotion이 크기 변화와 이동을 없앤 값을 준다.
 // 누를 때 줄어드는 비율.
 export const pressScale = 0.97;
+// 주 버튼을 누르는 동안의 불투명도. 크기와 달리 동작 줄이기에서도 그대로다.
+export const pressOpacity = 0.88;
+// 고른 평가 표시가 한 번 커지는 비율.
+export const pickScale = 1.2;
 // 작은 것(토스트, 글자)이 들어오고 나가는 거리.
 export const shift = 8;
 // 복습 카드가 들어오는 거리.
