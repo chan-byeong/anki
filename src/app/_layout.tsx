@@ -8,6 +8,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
+import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
 import { HandProvider } from '@/features/settings/HandProvider';
 import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
@@ -74,6 +75,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider storage={kvStore}>
+      {/* reanimated는 동작 줄이기가 켜지면 애니메이션을 건너뛰지만, 명세는 160ms 페이드를 남긴다.
+          판단은 useMotion(useReducedMotion)이 하므로 라이브러리 처리는 끈다(ADR 0020). */}
+      <ReducedMotionConfig mode={ReduceMotion.Never} />
       <HandProvider storage={kvStore}>
         {storeState.kind === 'open' ? (
           <StoreProvider store={storeState.store}>

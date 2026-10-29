@@ -110,7 +110,35 @@ export const size = {
 
 // --status-bar, --safe-bottom은 기기 값이라 토큰으로 두지 않는다. safe-area insets를 쓴다.
 
+// 시간(ms). --motion은 tokens.css, 나머지는 캔버스 motion.css에 있다.
+// 기본 전환: 페이드, 나가기, 카드 교체, 토스트, 목록에서 빠짐.
 export const motion = 160;
+// 누름 피드백, 아이콘 켜짐, 선택 원.
+export const motionPress = 100;
+// 큰 면이 들어올 때: 시트, 정답 공개.
+export const motionEnter = 240;
+// 길게 누르기 판정.
+export const motionHold = 400;
 
 // 캔버스 Motion의 --toast-hold: 토스트가 머무는 시간. 보조 줄(sub)이 있으면 더 오래 둔다.
 export const toastHold = { plain: 3000, withSub: 4000 } as const;
+
+// 늦을 때만 기다림 표시(--slow-after, --slow-min): after가 지나야 띄우고, 띄우면 최소 min 동안 둔다.
+export const slow = { after: 300, min: 400 } as const;
+
+// 곡선. cubic-bezier(x1, y1, x2, y2)의 네 값이라 애니메이션 라이브러리와 무관하다.
+export type Bezier = readonly [number, number, number, number];
+// 들어옴: 빠르게 시작해 부드럽게 멈춤.
+export const easeOut: Bezier = [0.2, 0, 0, 1];
+// 나감: 천천히 시작해 빠르게 사라짐.
+export const easeIn: Bezier = [0.4, 0, 1, 1];
+// 제자리 변화: 색, 크기, 높이.
+export const easeMove: Bezier = [0.4, 0, 0.2, 1];
+
+// 거리. 동작 줄이기에서는 useMotion이 크기 변화와 이동을 없앤 값을 준다.
+// 누를 때 줄어드는 비율.
+export const pressScale = 0.97;
+// 작은 것(토스트, 글자)이 들어오고 나가는 거리.
+export const shift = 8;
+// 복습 카드가 들어오는 거리.
+export const shiftCard = 24;
