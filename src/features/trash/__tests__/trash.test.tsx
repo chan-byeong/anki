@@ -9,7 +9,7 @@ import { createStore, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
-import { toastHold } from '@/theme/tokens';
+import { motion, toastHold } from '@/theme/tokens';
 
 // 휴지통에서 복구하고 영구 삭제하는 흐름을 실제 라우터 위에서 메모리 Store로 돌린다(card-edit.test.tsx와 같은 방식).
 jest.mock(
@@ -46,10 +46,10 @@ jest.mock('react-native/Libraries/Modal/Modal', () => {
   return { __esModule: true, default: DismissingModal };
 });
 
-// 시트가 다 닫히기를 기다린다.
+// 시트가 다 닫히기를 기다린다: 시트의 닫힘 애니메이션(motion) 뒤에 Modal이 내려가고 사라진다.
 const finishDismiss = () =>
   act(async () => {
-    jest.advanceTimersByTime(MOCK_DISMISS_MS);
+    jest.advanceTimersByTime(motion + MOCK_DISMISS_MS);
   });
 
 const newStore = (): Store =>
