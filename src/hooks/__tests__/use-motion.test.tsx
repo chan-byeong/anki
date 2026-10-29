@@ -1,7 +1,15 @@
 import { renderHook } from '@testing-library/react-native';
 
 import { useMotion } from '@/hooks/use-motion';
-import { motion, motionEnter, motionPress, pressScale, shift, shiftCard } from '@/theme/tokens';
+import {
+  motion,
+  motionEnter,
+  motionPress,
+  pickScale,
+  pressScale,
+  shift,
+  shiftCard,
+} from '@/theme/tokens';
 
 // 시스템 설정 구독은 useReducedMotion의 일이라 그 테스트에서 다룬다. 여기서는 그 값만 따른다.
 const mockReducedMotion = { current: false };
@@ -23,6 +31,7 @@ describe('useMotion', () => {
       motion,
       enter: motionEnter,
       pressScale,
+      pickScale,
       shift,
       shiftCard,
     });
@@ -39,6 +48,7 @@ describe('useMotion', () => {
       motion,
       enter: motion,
       pressScale: 1,
+      pickScale: 1,
       shift: 0,
       shiftCard: 0,
     });

@@ -1,6 +1,8 @@
 import type { ReactNode, Ref } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
+import { usePressProgress } from '../hooks/use-press-progress';
 import { size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { A11yRoleProps, InheritedA11yProps } from './a11y';
@@ -44,6 +46,8 @@ export function ListRow({
 }: ListRowProps) {
   const { colors, text } = useTheme();
   const minHeight = compact ? size.button : size.row;
+  const { progress, onPressIn, onPressOut } = usePressProgress();
+  const touchStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
 
   const body = (
     <>
@@ -79,12 +83,21 @@ export function ListRow({
       ]}
     >
       {onPress ? (
+        <Animated.View
+          testID="list-row-pressed"
+          pointerEvents="none"
+          style={[styles.touch, { backgroundColor: colors.surface }, touchStyle]}
+        />
+      ) : null}
+      {onPress ? (
         <Pressable
           {...a11y}
           ref={ref}
           accessibilityRole="button"
           onPress={onPress}
-          style={({ pressed }) => [styles.main, { minHeight, opacity: pressed ? 0.6 : 1 }]}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          style={[styles.main, { minHeight }]}
         >
           {body}
         </Pressable>
@@ -117,4 +130,6 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1 },
   value: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  // 누르는 동안의 바탕은 행이 놓인 화면 여백(space-4)까지 채워 글자가 바탕 끝에 붙지 않게 한다.
+  touch: { position: 'absolute', top: 0, bottom: 0, left: -space[4], right: -space[4] },
 });

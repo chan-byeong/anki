@@ -1,6 +1,8 @@
 import type { Ref } from 'react';
 import { Pressable, StyleSheet, type ViewInstance } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
+import { usePressProgress } from '../hooks/use-press-progress';
 import { radius, size } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { A11yLabelProps, A11yRoleProps, A11yStateProps, InheritedA11yProps } from './a11y';
@@ -38,6 +40,8 @@ export function IconButton({
   const { colors } = useTheme();
   const on = pressed === true;
   const color = on ? colors.inverse : tone === 'muted' ? colors.muted : colors.text;
+  const { progress, onPressIn, onPressOut } = usePressProgress();
+  const touchStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
 
   return (
     <Pressable
@@ -48,14 +52,17 @@ export function IconButton({
       accessibilityState={{ disabled, ...(pressed === undefined ? {} : { selected: pressed }) }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed: touching }) => [
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[
         styles.base,
-        {
-          backgroundColor: on ? colors.text : 'transparent',
-          opacity: disabled ? 0.4 : touching ? 0.5 : 1,
-        },
+        { backgroundColor: on ? colors.text : 'transparent', opacity: disabled ? 0.4 : 1 },
       ]}
     >
+      {/* 누르는 동안의 --surface 바탕. 켜진 동안은 켜짐 바탕(--text)을 그대로 둔다. */}
+      <Animated.View
+        style={[styles.touch, { backgroundColor: on ? 'transparent' : colors.surface }, touchStyle]}
+      />
       <Icon color={color} size={iconSize ?? (tone === 'muted' ? 20 : 22)} />
     </Pressable>
   );
@@ -69,4 +76,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  touch: { ...StyleSheet.absoluteFill, borderRadius: radius.sm },
 });

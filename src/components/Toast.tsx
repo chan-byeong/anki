@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { radius, size, space } from '../theme/tokens';
+import { useMotion } from '../hooks/use-motion';
+import { easeIn, easeOut, radius, size, space } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import type { IconComponent } from './icons';
 import { LiveAnnouncer } from './LiveAnnouncer';
@@ -16,9 +18,25 @@ interface ToastProps {
 }
 
 // 보이고 사라지는 시점은 호출 측이 정한다(저절로 사라지는 타이머 포함).
+// 나타날 때 아래에서 떠오르며 페이드, 사라질 때 내려가며 페이드. 떠 있는 동안 내용만 바뀌면
+// 다시 움직이지 않는다(머무는 시간은 호출 측이 다시 센다).
 export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps) {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
+  const { motion, shift } = useMotion();
+  const { entering, exiting } = useMemo(
+    () => ({
+      entering: new Keyframe({
+        0: { opacity: 0, transform: [{ translateY: shift }] },
+        100: { opacity: 1, transform: [{ translateY: 0 }], easing: Easing.bezier(...easeOut) },
+      }).duration(motion),
+      exiting: new Keyframe({
+        0: { opacity: 1, transform: [{ translateY: 0 }] },
+        100: { opacity: 0, transform: [{ translateY: shift }], easing: Easing.bezier(...easeIn) },
+      }).duration(motion),
+    }),
+    [motion, shift],
+  );
   const spoken = sub ? `${message}. ${sub}` : message;
   // accessibilityLiveRegion은 Android 전용이라 iOS는 직접 읽어 주고, 웹은 LiveAnnouncer가 읽는다.
   useEffect(() => {
@@ -32,7 +50,9 @@ export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps
     space[2];
 
   return (
-    <View
+    <Animated.View
+      entering={entering}
+      exiting={exiting}
       accessible
       accessibilityLiveRegion="polite"
       accessibilityLabel={spoken}
@@ -50,7 +70,7 @@ export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps
           <Text style={[text('caption'), { color: colors.inverse, opacity: 0.8 }]}>{sub}</Text>
         ) : null}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
