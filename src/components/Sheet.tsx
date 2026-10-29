@@ -1,20 +1,29 @@
-import { useEffect, useId, useRef, type RefObject } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, useState, type RefObject } from 'react';
 import {
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
+  type LayoutChangeEvent,
   type TextInstance,
   type ViewInstance,
 } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
-import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { useMotion } from '@/hooks/use-motion';
 import { moveFocus } from '@/utils/move-focus';
 import { useTheme } from '../theme/ThemeProvider';
-import { radius, size, space } from '../theme/tokens';
+import { easeIn, easeOut, radius, size, space } from '../theme/tokens';
 import { Button, type ButtonVariant } from './Button';
 import type { IconComponent } from './icons';
 
@@ -83,13 +92,13 @@ function useDevWarnings(visible: boolean, kind: SheetKind, actions: readonly She
 }
 
 // 닫힌 뒤 트리거로 포커스를 돌려주고 onClosed를 부른다. Modal이 완전히 사라진 뒤 부르는 onDismiss는
-// iOS와 웹에만 있어서, Android는 visible이 true에서 false로 바뀔 때 보낸다.
+// iOS와 웹에만 있어서, Android는 Modal을 내리는 순간(shown이 true에서 false로 바뀔 때) 보낸다.
 function useAfterClose(
-  visible: boolean,
+  shown: boolean,
   triggerRef?: RefObject<ViewInstance | null>,
   onClosed?: () => void,
 ): () => void {
-  const wasVisible = useRef(visible);
+  const wasShown = useRef(shown);
   const afterClose = () => {
     const trigger = triggerRef?.current;
     if (trigger) moveFocus(trigger);
@@ -97,12 +106,58 @@ function useAfterClose(
   };
 
   useEffect(() => {
-    const closed = wasVisible.current && !visible;
-    wasVisible.current = visible;
+    const closed = wasShown.current && !shown;
+    wasShown.current = shown;
     if (closed && Platform.OS === 'android') afterClose();
   });
 
   return afterClose;
+}
+
+const EASE_OUT = Easing.bezier(...easeOut);
+const EASE_IN = Easing.bezier(...easeIn);
+
+// 열고 닫는 움직임(ADR 0005). 가림막은 페이드, 패널은 아래에서 올라온다(열림 enter·easeOut,
+// 닫힘 motion·easeIn). 동작 줄이기에서는 패널도 움직이지 않고 페이드만 한다. Modal은 닫힘
+// 애니메이션이 끝난 뒤에 내려가므로 shown이 visible보다 늦게 false가 된다.
+function useSheetMotion(visible: boolean, onOpened: () => void) {
+  const { reduced, motion, enter } = useMotion();
+  const [shown, setShown] = useState(visible);
+  if (visible && !shown) setShown(true);
+  const progress = useSharedValue(0);
+  // 패널 높이를 재기 전에는 화면 높이만큼 아래에 둔다.
+  const panelHeight = useSharedValue(useWindowDimensions().height);
+
+  const opened = useEffectEvent(onOpened);
+  // 닫히는 사이 다시 열렸으면 내리지 않는다.
+  const closed = useEffectEvent(() => {
+    if (!visible) setShown(false);
+  });
+
+  useEffect(() => {
+    progress.value = visible
+      ? withTiming(1, { duration: enter, easing: EASE_OUT }, (finished) => {
+          if (finished) scheduleOnRN(opened);
+        })
+      : withTiming(0, { duration: motion, easing: EASE_IN }, (finished) => {
+          if (finished) scheduleOnRN(closed);
+        });
+  }, [visible, enter, motion, progress]);
+
+  const dimStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const panelStyle = useAnimatedStyle(
+    () =>
+      reduced
+        ? { opacity: progress.value, transform: [{ translateY: 0 }] }
+        : { opacity: 1, transform: [{ translateY: (1 - progress.value) * panelHeight.value }] },
+    [reduced],
+  );
+
+  const onPanelLayout = (event: LayoutChangeEvent) => {
+    panelHeight.value = event.nativeEvent.layout.height;
+  };
+
+  return { shown, dimStyle, panelStyle, onPanelLayout };
 }
 
 export function Sheet({
@@ -117,11 +172,9 @@ export function Sheet({
 }: SheetProps): React.JSX.Element {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
-  const reducedMotion = useReducedMotion();
   const titleId = useId();
   const titleRef = useRef<TextInstance>(null);
   const firstActionRef = useRef<ViewInstance>(null);
-  const afterClose = useAfterClose(visible, triggerRef, onClosed);
   useDevWarnings(visible, kind, actions);
 
   const confirm = kind === 'confirm';
@@ -132,6 +185,8 @@ export function Sheet({
     const target = titleRef.current ?? firstActionRef.current;
     if (target) moveFocus(target);
   };
+  const { shown, dimStyle, panelStyle, onPanelLayout } = useSheetMotion(visible, focusInside);
+  const afterClose = useAfterClose(shown, triggerRef, onClosed);
 
   // 먼저 닫고 액션을 부른다. 액션이 다음 시트를 여는 연쇄 흐름에서 닫기가 그 상태를 덮지 않는다.
   const press = (action: SheetAction) => {
@@ -141,13 +196,12 @@ export function Sheet({
 
   return (
     <Modal
-      visible={visible}
+      visible={shown}
       transparent
-      animationType={reducedMotion ? 'none' : 'slide'}
+      animationType="none"
       statusBarTranslucent
       navigationBarTranslucent
       onRequestClose={onClose}
-      onShow={focusInside}
       onDismiss={afterClose}
     >
       {/* 가림막과 패널을 함께 감싼다. aria-modal은 형제를 VoiceOver에서 가리므로 패널에만 달면
@@ -160,29 +214,36 @@ export function Sheet({
         // aria-labelledby는 Android 전용이다. iOS는 열자마자 제목으로 포커스가 가서 이름을 읽는다.
         aria-labelledby={title ? titleId : undefined}
         onAccessibilityEscape={onClose}
+        // 닫히는 동안에는 눌리지 않게 해서 같은 액션이 두 번 불리지 않는다.
+        pointerEvents={visible ? 'auto' : 'none'}
         style={styles.root}
       >
+        <Animated.View
+          testID="sheet-dim"
+          aria-hidden
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.dim }, dimStyle]}
+        />
         {/* menu는 가림막이 "메뉴 닫기" 버튼이고, confirm은 눌러도 닫히지 않는 장식이다(ADR 0008). */}
         {confirm ? (
-          <View
-            testID="sheet-scrim"
-            aria-hidden
-            style={[StyleSheet.absoluteFill, { backgroundColor: colors.dim }]}
-          />
+          <View testID="sheet-scrim" aria-hidden style={StyleSheet.absoluteFill} />
         ) : (
           <Pressable
             testID="sheet-scrim"
             accessibilityRole="button"
             accessibilityLabel="메뉴 닫기"
             onPress={onClose}
-            style={[StyleSheet.absoluteFill, { backgroundColor: colors.dim }]}
+            style={StyleSheet.absoluteFill}
           />
         )}
-        <View
+        <Animated.View
+          testID="sheet-panel"
+          onLayout={onPanelLayout}
           style={[
             styles.panel,
             confirm ? styles.confirm : null,
             { backgroundColor: colors.bg, paddingBottom: space[2] + insets.bottom },
+            panelStyle,
           ]}
         >
           <View
@@ -229,7 +290,7 @@ export function Sheet({
               />
             );
           })}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

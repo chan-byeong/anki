@@ -7,6 +7,7 @@ import {
   screen,
   userEvent,
 } from '@testing-library/react-native';
+import { motion, motionEnter } from '@/theme/tokens';
 import React from 'react';
 import { AccessibilityInfo, Platform, type ViewInstance } from 'react-native';
 
@@ -18,6 +19,7 @@ const mockModalProps: {
     onShow?: () => void;
     onDismiss?: () => void;
     animationType?: string;
+    visible?: boolean;
   };
 } = {};
 jest.mock('react-native/Libraries/Modal/Modal', () => {
@@ -65,6 +67,11 @@ const sheetDefaultProps = {
   visible: true,
   onClose: jest.fn(),
 };
+
+const advance = (ms: number) =>
+  act(async () => {
+    jest.advanceTimersByTime(ms);
+  });
 
 // 컨테이너는 자식 항목이 하나로 합쳐지지 않도록 accessible이 아니라서(ADR 0008) role 쿼리에 잡히지 않는다.
 // testID로 찾고 role은 prop으로 확인한다.
@@ -284,15 +291,25 @@ describe('초기 포커스 (ADR 0007)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     sendEvent = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation();
   });
 
   afterEach(() => {
     sendEvent.mockRestore();
+    jest.useRealTimers();
   });
 
-  // 열기 애니메이션이 끝난 뒤(onShow) 포커스를 보낸다.
-  const showSheet = () => act(() => mockModalProps.current?.onShow?.());
+  // 열기 애니메이션(240ms)이 끝난 뒤 포커스를 보낸다.
+  const showSheet = () => advance(motionEnter);
+
+  it('열기 애니메이션이 끝나기 전에는 포커스를 보내지 않는다.', async () => {
+    await renderSheet({ title: 'Test', kind: 'confirm', actions, ...sheetDefaultProps });
+
+    await advance(motionEnter - 1);
+
+    expect(sendEvent).not.toHaveBeenCalled();
+  });
 
   it('열리기 전에는 포커스를 보내지 않는다.', async () => {
     await renderSheet({ title: 'Test', kind: 'confirm', actions, ...sheetDefaultProps });
@@ -390,6 +407,7 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
   const triggerRef = { current: trigger };
 
   beforeEach(() => {
+    jest.useFakeTimers();
     sendEvent = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation();
   });
 
@@ -398,7 +416,15 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
   afterEach(() => {
     sendEvent.mockRestore();
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
+
+  // 열린 뒤 닫는다. 닫힘 애니메이션(160ms)이 끝나야 Modal이 내려간다.
+  const close = async (view: Awaited<ReturnType<typeof render>>, props = {}) => {
+    await advance(motionEnter);
+    await view.rerender(sheet({ ...props, visible: false }));
+  };
+  const finishClose = () => advance(motion);
 
   const sheet = (props: Partial<React.ComponentProps<typeof Sheet>>) => (
     <ThemeProvider>
@@ -413,9 +439,11 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
   );
 
   // iOS와 웹은 Modal이 완전히 닫힌 뒤(onDismiss) 보낸다. RN 네이티브의 onDismiss는 iOS에서만 호출된다.
-  it('iOS: 닫히고 Modal이 사라진 뒤 트리거 ref로 포커스를 보낸다', async () => {
+  it('iOS: 닫힘 애니메이션 뒤 Modal이 사라지면 트리거 ref로 포커스를 보낸다', async () => {
     const view = await render(sheet({}));
-    await view.rerender(sheet({ visible: false }));
+    await close(view);
+    sendEvent.mockClear();
+    await finishClose();
     expect(sendEvent).not.toHaveBeenCalled();
 
     await act(() => mockModalProps.current?.onDismiss?.());
@@ -424,11 +452,15 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
     expect(sendEvent).toHaveBeenCalledWith(trigger, 'focus');
   });
 
-  it('Android: 닫히는 순간 트리거 ref로 포커스를 보낸다', async () => {
+  it('Android: 닫힘 애니메이션이 끝나 Modal을 내리는 순간 트리거 ref로 포커스를 보낸다', async () => {
     jest.replaceProperty(Platform, 'OS', 'android');
     const view = await render(sheet({}));
+    await close(view);
+    sendEvent.mockClear();
+    await advance(motion - 1);
+    expect(sendEvent).not.toHaveBeenCalled();
 
-    await view.rerender(sheet({ visible: false }));
+    await advance(1);
 
     expect(sendEvent).toHaveBeenCalledTimes(1);
     expect(sendEvent).toHaveBeenCalledWith(trigger, 'focus');
@@ -440,7 +472,8 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
     const focus = jest.fn();
     const webTrigger = { current: { focus } as unknown as ViewInstance };
     const view = await render(sheet({ triggerRef: webTrigger }));
-    await view.rerender(sheet({ triggerRef: webTrigger, visible: false }));
+    await close(view, { triggerRef: webTrigger });
+    await finishClose();
 
     await act(() => mockModalProps.current?.onDismiss?.());
 
@@ -452,8 +485,10 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
     // 연쇄 흐름에서 menu는 닫힐 때 triggerRef가 없어서, 열리는 confirm의 포커스를 빼앗지 않는다.
     jest.replaceProperty(Platform, 'OS', 'android');
     const view = await render(sheet({}));
+    await close(view, { triggerRef: undefined });
+    sendEvent.mockClear();
 
-    await view.rerender(sheet({ triggerRef: undefined, visible: false }));
+    await finishClose();
 
     expect(sendEvent).not.toHaveBeenCalled();
   });
@@ -462,13 +497,16 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
     jest.replaceProperty(Platform, 'OS', 'android');
     const view = await render(sheet({ visible: false }));
     await view.rerender(sheet({ visible: false }));
+    await finishClose();
 
     expect(sendEvent).not.toHaveBeenCalled();
   });
 
   it('트리거 ref가 비어 있어도 오류 없이 닫힌다', async () => {
     const view = await render(sheet({ triggerRef: { current: null } }));
-    await view.rerender(sheet({ triggerRef: { current: null }, visible: false }));
+    await close(view, { triggerRef: { current: null } });
+    await finishClose();
+    sendEvent.mockClear();
 
     await act(() => mockModalProps.current?.onDismiss?.());
 
@@ -478,7 +516,8 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
   it('연쇄 흐름(menu→confirm)에서 confirm이 닫힐 때도 같은 트리거 ref로 보낸다', async () => {
     // 호출부가 마지막 시트에 처음 트리거 ref를 넘기는 구성이 전제다(ADR 0006).
     const view = await render(sheet({ kind: 'confirm', title: '삭제할까요?' }));
-    await view.rerender(sheet({ kind: 'confirm', title: '삭제할까요?', visible: false }));
+    await close(view, { kind: 'confirm', title: '삭제할까요?' });
+    await finishClose();
 
     await act(() => mockModalProps.current?.onDismiss?.());
 
@@ -486,38 +525,93 @@ describe('포커스 복귀 (ADR 0006, 0007)', () => {
   });
 });
 
-describe('모션 줄이기 (ADR 0005)', () => {
+describe('열고 닫는 움직임 (ADR 0005)', () => {
   // 구독은 훅(useReducedMotion)의 일이라 훅 테스트에서 다룬다. 여기서는 훅의 값만 따른다.
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
   afterEach(() => {
     mockReducedMotion.current = false;
+    jest.useRealTimers();
   });
 
-  it('모션 줄이기가 켜져 있으면 전환 애니메이션이 없다.', async () => {
+  const sheet = (visible: boolean) => (
+    <ThemeProvider>
+      <Sheet kind="menu" actions={actions} visible={visible} onClose={jest.fn()} />
+    </ThemeProvider>
+  );
+  const panel = () => screen.getByTestId('sheet-panel');
+  const dim = () => screen.getByTestId('sheet-dim', { includeHiddenElements: true });
+  const settled = { transform: [{ translateY: 0 }] };
+
+  it('플랫폼 전환 대신 직접 움직이므로 Modal 자체 애니메이션은 쓰지 않는다', async () => {
+    await render(sheet(true));
+    expect(mockModalProps.current?.animationType).toBe('none');
+
     mockReducedMotion.current = true;
-
-    await renderSheet({ title: 'Test', kind: 'menu', actions, ...sheetDefaultProps });
-
+    await render(sheet(true));
     expect(mockModalProps.current?.animationType).toBe('none');
   });
 
-  it('모션 줄이기가 꺼져 있으면 전환 애니메이션이 있다.', async () => {
-    await renderSheet({ title: 'Test', kind: 'menu', actions, ...sheetDefaultProps });
+  it('열면 가림막이 페이드로 나타나고 패널이 240ms에 걸쳐 아래에서 올라온다', async () => {
+    await render(sheet(true));
+    expect(panel()).not.toHaveAnimatedStyle(settled);
+    expect(dim()).toHaveAnimatedStyle({ opacity: 0 });
 
-    expect(mockModalProps.current?.animationType).not.toBe('none');
+    await advance(motionEnter / 2);
+    expect(panel()).not.toHaveAnimatedStyle(settled);
+
+    await advance(motionEnter / 2);
+    expect(panel()).toHaveAnimatedStyle(settled);
+    expect(dim()).toHaveAnimatedStyle({ opacity: 1 });
   });
 
-  it('열려 있는 동안 설정이 바뀌면 다시 그릴 때 반영된다.', async () => {
-    const view = await renderSheet({ title: 'Test', kind: 'menu', actions, ...sheetDefaultProps });
-    expect(mockModalProps.current?.animationType).not.toBe('none');
+  it('닫으면 160ms 동안 내려가며 사라진 뒤에 Modal을 내린다', async () => {
+    const view = await render(sheet(true));
+    await advance(motionEnter);
 
+    await view.rerender(sheet(false));
+    await advance(motion - 1);
+    expect(mockModalProps.current?.visible).toBe(true);
+
+    await advance(1);
+    expect(mockModalProps.current?.visible).toBe(false);
+  });
+
+  it('닫히는 동안에는 눌리지 않아 액션이 다시 불리지 않는다', async () => {
+    const view = await render(sheet(true));
+    await advance(motionEnter);
+    await view.rerender(sheet(false));
+
+    expect(getContainer()).toHaveProp('pointerEvents', 'none');
+  });
+
+  it('닫히는 중에 다시 열면 Modal을 내리지 않고 다시 올라온다', async () => {
+    const view = await render(sheet(true));
+    await advance(motionEnter);
+    await view.rerender(sheet(false));
+    await advance(motion / 2);
+
+    await view.rerender(sheet(true));
+    await advance(motionEnter);
+
+    expect(mockModalProps.current?.visible).toBe(true);
+    expect(panel()).toHaveAnimatedStyle(settled);
+    expect(dim()).toHaveAnimatedStyle({ opacity: 1 });
+  });
+
+  it('동작 줄이기가 켜지면 패널은 움직이지 않고 160ms 페이드로만 열고 닫는다', async () => {
     mockReducedMotion.current = true;
-    await view.rerender(
-      <ThemeProvider>
-        <Sheet title="Test" kind="menu" actions={actions} {...sheetDefaultProps} />
-      </ThemeProvider>,
-    );
+    const view = await render(sheet(true));
+    expect(panel()).toHaveAnimatedStyle({ ...settled, opacity: 0 });
 
-    expect(mockModalProps.current?.animationType).toBe('none');
+    await advance(motion);
+    expect(panel()).toHaveAnimatedStyle({ ...settled, opacity: 1 });
+
+    await view.rerender(sheet(false));
+    await advance(motion);
+    expect(mockModalProps.current?.visible).toBe(false);
   });
 });
 
