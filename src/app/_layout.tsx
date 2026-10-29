@@ -12,6 +12,8 @@ import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
 import { HandProvider } from '@/features/settings/HandProvider';
 import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
+import { useMotion } from '@/hooks/use-motion';
+import { screenTransition, type ScreenTransition } from '@/navigation/screen-transitions';
 import { kvStore } from '@/storage/kv-store';
 import { openAppStore } from '@/storage/open-app-store';
 import type { Store } from '@/storage/store';
@@ -20,16 +22,31 @@ import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync();
 
+// 화면마다 전환 모양을 여기 한 곳에 둔다(STA-157). 덱 목록(index)은 뿌리라 밀려 들어오지 않고,
+// router.replace('/')로 돌아올 때(복습 끝, 덱 만든 뒤 등)만 바꿔 끼운다.
+const SCREENS: { name: string; transition: ScreenTransition }[] = [
+  { name: 'index', transition: 'replace' },
+  { name: 'deck/[id]', transition: 'push' },
+  { name: 'settings', transition: 'push' },
+  { name: 'stats', transition: 'push' },
+  { name: 'trash', transition: 'push' },
+  { name: 'review/[deckId]', transition: 'push' },
+  { name: 'deck/new', transition: 'modal' },
+  { name: 'deck/[id]/edit', transition: 'modal' },
+  { name: 'card/new', transition: 'modal' },
+  { name: 'card/[id]', transition: 'modal' },
+];
+
 function ThemedStack() {
   const { name, colors } = useTheme();
+  const { reduced } = useMotion();
   return (
     <>
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Screen name="deck/new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="deck/[id]/edit" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="card/new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="card/[id]" options={{ presentation: 'modal' }} />
+        {SCREENS.map(({ name: route, transition }) => (
+          <Stack.Screen key={route} name={route} options={screenTransition(transition, reduced)} />
+        ))}
       </Stack>
     </>
   );
