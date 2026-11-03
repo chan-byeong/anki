@@ -6,12 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
   CloseIcon,
+  Collapsible,
+  CountText,
+  ExitingRow,
   IconButton,
   InboxIcon,
   Notice,
   PlusIcon,
-  Sheet,
   SettingsIcon,
+  Sheet,
   StatsIcon,
 } from '@/components';
 import { DeckRow } from '@/features/decks/components/DeckRow';
@@ -70,17 +73,22 @@ export default function HomeScreen() {
       ) : (
         <View style={[styles.header, styles.selectHeader]}>
           <IconButton icon={CloseIcon} label="선택 끝내기" onPress={() => setSelected(null)} />
-          <Text
+          {/* 고른 수가 바뀌면 숫자만 위로 8px 바뀐다. 스크린 리더는 "n개 선택"을 한 덩어리로 읽는다. */}
+          <View
+            accessible
             accessibilityRole="header"
+            accessibilityLabel={`${selected.length}개 선택`}
             accessibilityLiveRegion="polite"
             aria-live="polite"
-            style={text('title', { weight: 'bold' })}
+            style={styles.selectTitle}
           >
-            {`${selected.length}개 선택`}
-          </Text>
+            <CountText value={selected.length} style={text('title', { weight: 'bold' })} />
+            <Text style={text('title', { weight: 'bold' })}>개 선택</Text>
+          </View>
         </View>
       )}
-      {lowSpace ? (
+      {/* Notice·배너는 높이를 열며 나타나고, 풀리면 접힌다. */}
+      <Collapsible open={lowSpace}>
         <View style={styles.lowSpace}>
           <Notice
             tone="danger"
@@ -89,13 +97,13 @@ export default function HomeScreen() {
             body="새 카드와 이미지를 저장하지 못할 수 있어요. 기기 공간을 정리해 주세요."
           />
         </View>
-      ) : null}
+      </Collapsible>
       {/* 처음 읽는 동안에는 비워 둔다. 빈 상태가 잠깐 보였다 사라지지 않게 하기 위해서다. */}
-      {state.kind === 'failed' ? (
+      <Collapsible open={state.kind === 'failed'}>
         <View style={styles.notice}>
           <Notice tone="danger" title="덱 목록을 불러오지 못했어요" body="앱을 다시 열어 주세요." />
         </View>
-      ) : null}
+      </Collapsible>
       {state.kind === 'ready' && state.items.length === 0 ? <EmptyDecks /> : null}
       {state.kind === 'ready' && state.items.length > 0 ? (
         <DeckList items={state.items} selected={selected} onSelectedChange={setSelected} />
@@ -135,7 +143,7 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
 
   return (
     <>
-      {guide.visible && selected === null ? (
+      <Collapsible open={guide.visible && selected === null}>
         <View style={styles.guide}>
           <Notice
             line
@@ -143,25 +151,27 @@ function DeckList({ items, selected, onSelectedChange }: DeckListProps) {
             action={{ label: '닫기', onPress: guide.dismiss }}
           />
         </View>
-      ) : null}
+      </Collapsible>
       <ScrollView style={styles.fill} contentContainerStyle={styles.list}>
         <View accessibilityRole="list" accessibilityLabel="덱 목록">
+          {/* 휴지통으로 옮긴 덱은 페이드로 빠지고 아래 행이 올라온다. */}
           {items.map(({ deck, todayCount, cardCount }, index) => (
-            <DeckRow
-              key={deck.id}
-              name={deck.name}
-              todayCount={todayCount}
-              cardCount={cardCount}
-              onStartReview={() =>
-                router.push({ pathname: '/review/[deckId]', params: { deckId: deck.id } })
-              }
-              onOpenDeck={() => router.push({ pathname: '/deck/[id]', params: { id: deck.id } })}
-              onOpenMenu={() => setMenuDeckId(deck.id)}
-              onEnterSelect={() => onSelectedChange([deck.id])}
-              selected={selected === null ? undefined : selected.includes(deck.id)}
-              onToggleSelect={() => toggle(deck.id)}
-              last={index === items.length - 1}
-            />
+            <ExitingRow key={deck.id}>
+              <DeckRow
+                name={deck.name}
+                todayCount={todayCount}
+                cardCount={cardCount}
+                onStartReview={() =>
+                  router.push({ pathname: '/review/[deckId]', params: { deckId: deck.id } })
+                }
+                onOpenDeck={() => router.push({ pathname: '/deck/[id]', params: { id: deck.id } })}
+                onOpenMenu={() => setMenuDeckId(deck.id)}
+                onEnterSelect={() => onSelectedChange([deck.id])}
+                selected={selected === null ? undefined : selected.includes(deck.id)}
+                onToggleSelect={() => toggle(deck.id)}
+                last={index === items.length - 1}
+              />
+            </ExitingRow>
           ))}
         </View>
       </ScrollView>
@@ -217,6 +227,7 @@ function EmptyDecks() {
 }
 
 const styles = StyleSheet.create({
+  selectTitle: { flexDirection: 'row' },
   screen: { flex: 1 },
   fill: { flex: 1 },
   header: {
