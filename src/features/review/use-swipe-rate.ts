@@ -32,10 +32,12 @@ export function useSwipeRate({ enabled, onRate, leaving }: UseSwipeRateOptions) 
   const side = useSharedValue(0);
   const [armed, setArmed] = useState<SwipeRating | null>(null);
 
+  // UI 스레드의 제스처에서 scheduleOnRN으로 부르는 쪽은 JS 스레드 함수다.
   const arm = (next: SwipeRating | null) => {
     setArmed(next);
     if (next !== null) haptic.threshold();
   };
+  const disarm = () => setArmed(null);
 
   const gesture = usePanGesture({
     enabled,
@@ -60,7 +62,7 @@ export function useSwipeRate({ enabled, onRate, leaving }: UseSwipeRateOptions) 
       'worklet';
       const rating = swipeRatingAt(event.translationX);
       side.value = 0;
-      scheduleOnRN(setArmed, null);
+      scheduleOnRN(disarm);
       if (rating === null) {
         offset.value = withTiming(0, { duration: motion, easing: EASE_OUT });
       } else {

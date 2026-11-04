@@ -41,6 +41,9 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
   const base = useSharedValue(0);
   const [open, setOpen] = useState(false);
 
+  const buzz = () => haptic.threshold();
+  const markOpen = (next: boolean) => setOpen(next);
+
   const close = () => {
     base.value = 0;
     offset.value = withTiming(0, { duration: motion, easing: EASE_OUT });
@@ -70,7 +73,7 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
       const code = now === 'commit' ? 2 : now === 'open' ? 1 : 0;
       if (code !== zone.value) {
         // 문턱을 위로 넘을 때만 울린다. 되돌아올 때는 울리지 않는다.
-        if (code > zone.value) scheduleOnRN(haptic.threshold);
+        if (code > zone.value) scheduleOnRN(buzz);
         zone.value = code;
       }
     },
@@ -83,11 +86,11 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
       } else if (settled === 'open') {
         base.value = -TRASH_OPEN_WIDTH;
         offset.value = withTiming(-TRASH_OPEN_WIDTH, { duration: motion, easing: EASE_OUT });
-        scheduleOnRN(setOpen, true);
+        scheduleOnRN(markOpen, true);
       } else {
         base.value = 0;
         offset.value = withTiming(0, { duration: motion, easing: EASE_OUT });
-        scheduleOnRN(setOpen, false);
+        scheduleOnRN(markOpen, false);
       }
     },
   });

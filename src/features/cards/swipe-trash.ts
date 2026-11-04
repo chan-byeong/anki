@@ -7,7 +7,9 @@ export const TRASH_COMMIT_RATIO = 0.6;
 export type TrashSwipeZone = 'close' | 'open' | 'commit';
 
 // offset은 왼쪽으로 밀수록 작아지는 음수다.
+// 제스처(UI 스레드)에서 바로 부르므로 worklet으로 표시한다. 표시하지 않으면 부르는 순간 던지고 앱이 종료된다.
 export const trashSwipeZone = (offset: number, rowWidth: number): TrashSwipeZone => {
+  'worklet';
   const pulled = -offset;
   if (rowWidth > 0 && pulled > rowWidth * TRASH_COMMIT_RATIO) return 'commit';
   return pulled >= TRASH_OPEN_WIDTH ? 'open' : 'close';

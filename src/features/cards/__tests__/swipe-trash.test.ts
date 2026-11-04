@@ -1,3 +1,5 @@
+import { isWorkletFunction } from 'react-native-worklets';
+
 import { trashSwipeZone } from '@/features/cards/swipe-trash';
 
 // 행 너비 342px 기준: 열림 88px, 바로 휴지통은 60% = 205.2px.
@@ -19,5 +21,10 @@ describe('밀어서 휴지통', () => {
 
   test('너비를 아직 모르면 바로 휴지통으로 가지 않는다', () => {
     expect(trashSwipeZone(-120, 0)).toBe('open');
+  });
+
+  // 제스처는 UI 스레드에서 이 함수를 바로 부른다. worklet이 아니면 부르는 순간 던져 앱이 종료된다.
+  test('UI 스레드에서 부르는 함수는 worklet이다', () => {
+    expect(isWorkletFunction(trashSwipeZone)).toBe(true);
   });
 });

@@ -1,3 +1,5 @@
+import { isWorkletFunction } from 'react-native-worklets';
+
 import { swipeProgress, swipeRatingAt } from '@/features/review/swipe-rate';
 
 describe('밀어서 평가', () => {
@@ -20,5 +22,11 @@ describe('밀어서 평가', () => {
     expect(swipeProgress(200, 1)).toBe(1);
     expect(swipeProgress(48, -1)).toBe(0);
     expect(swipeProgress(-48, 1)).toBe(0);
+  });
+
+  // 제스처와 애니메이션 스타일은 UI 스레드에서 이 함수들을 바로 부른다. worklet이 아니면 부르는 순간 던져 앱이 종료된다.
+  test('UI 스레드에서 부르는 함수는 worklet이다', () => {
+    expect(isWorkletFunction(swipeRatingAt)).toBe(true);
+    expect(isWorkletFunction(swipeProgress)).toBe(true);
   });
 });
