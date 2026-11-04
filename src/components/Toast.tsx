@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,6 +13,8 @@ interface ToastProps {
   message: string;
   sub?: string;
   icon?: IconComponent;
+  // 손으로 누르는 버튼이 있는 토스트(되돌리기). 있으면 글자와 버튼을 따로 읽는다.
+  action?: { label: string; onPress: () => void };
   // 떠 있을 자리: 아래 행동 영역이 버튼이면 button, 평가 버튼이면 rating.
   above?: 'button' | 'rating';
 }
@@ -20,7 +22,7 @@ interface ToastProps {
 // 보이고 사라지는 시점은 호출 측이 정한다(저절로 사라지는 타이머 포함).
 // 나타날 때 아래에서 떠오르며 페이드, 사라질 때 내려가며 페이드. 떠 있는 동안 내용만 바뀌면
 // 다시 움직이지 않는다(머무는 시간은 호출 측이 다시 센다).
-export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps) {
+export function Toast({ message, sub, icon: Icon, action, above = 'button' }: ToastProps) {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
   const { motion, shift } = useMotion();
@@ -53,9 +55,9 @@ export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps
     <Animated.View
       entering={entering}
       exiting={exiting}
-      accessible
+      accessible={!action}
       accessibilityLiveRegion="polite"
-      accessibilityLabel={spoken}
+      accessibilityLabel={action ? undefined : spoken}
       style={[styles.toast, { backgroundColor: colors.text, bottom }]}
     >
       <LiveAnnouncer message={spoken} />
@@ -64,12 +66,30 @@ export function Toast({ message, sub, icon: Icon, above = 'button' }: ToastProps
           <Icon color={colors.inverse} size={18} />
         </View>
       ) : null}
-      <View style={styles.text}>
+      <View
+        style={styles.text}
+        accessible={action ? true : undefined}
+        accessibilityLabel={action ? spoken : undefined}
+      >
         <Text style={[text('body', { weight: 'bold' }), { color: colors.inverse }]}>{message}</Text>
         {sub ? (
           <Text style={[text('caption'), { color: colors.inverse, opacity: 0.8 }]}>{sub}</Text>
         ) : null}
       </View>
+      {action ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          onPress={action.onPress}
+          style={styles.action}
+        >
+          <Text
+            style={[text('body', { weight: 'bold' }), styles.actionText, { color: colors.inverse }]}
+          >
+            {action.label}
+          </Text>
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
@@ -86,4 +106,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   text: { flex: 1, gap: space[1] },
+  // 토스트 안쪽 여백만큼 음수로 당겨 눈에 보이는 높이는 그대로 두고 누르는 자리만 size.touch로 넓힌다.
+  action: {
+    minHeight: size.touch,
+    paddingHorizontal: space[2],
+    marginVertical: -space[2],
+    marginRight: -space[2],
+    justifyContent: 'center',
+  },
+  actionText: { textDecorationLine: 'underline' },
 });
