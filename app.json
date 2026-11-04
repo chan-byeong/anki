@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "anki",
-    "slug": "anki",
+    "name": "Hanjang",
+    "slug": "hanjang",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "anki",
+    "scheme": "hanjang",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
