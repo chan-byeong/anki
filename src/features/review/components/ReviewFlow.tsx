@@ -30,6 +30,10 @@ export function ReviewFlow({ deckIds, cards, insetBottom }: ReviewFlowProps) {
             // 같은 카드가 재등장해도 새 앞면으로 시작한다. 순서와 남은 수는 nextCardAfterRating의 결과만 쓴다.
             key={progress.ratings.length}
             card={progress.card}
+            remaining={progress.remaining}
+            // 눌러서 저장하는 동안만 나간다. 저장에 실패하면 고른 평가만 남고 카드는 돌아온다.
+            leaving={saving && pendingRating !== null}
+            rise={progress.ratings.length > 0}
             insetBottom={insetBottom}
             onRate={rate}
             ratingDisabled={saving}

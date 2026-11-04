@@ -16,6 +16,8 @@ interface CardRowProps {
   // 검색어. 앞면·뒷면에서 일치하는 부분에 밑줄을 긋는다.
   highlight?: string;
   onPress: () => void;
+  // 밀어서 휴지통과 같은 일. 스크린 리더는 이 동작으로 휴지통에 보낸다.
+  onTrash?: () => void;
   last?: boolean;
 }
 
@@ -40,6 +42,7 @@ export function CardRow({
   status,
   highlight = '',
   onPress,
+  onTrash,
   last = false,
 }: CardRowProps) {
   const { colors, text } = useTheme();
@@ -48,6 +51,10 @@ export function CardRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${front}, ${back}`}
+      accessibilityActions={onTrash ? [{ name: 'trash', label: '휴지통으로 옮기기' }] : undefined}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'trash') onTrash?.();
+      }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,

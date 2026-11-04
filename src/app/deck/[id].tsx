@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,10 +14,12 @@ import {
   PageHeader,
   PlusIcon,
   Sheet,
+  Toast,
   TopBar,
   TrashIcon,
 } from '@/components';
 import { CardRow } from '@/features/cards/components/CardRow';
+import { SwipeToTrash } from '@/features/cards/components/SwipeToTrash';
 import { CardSearchField } from '@/features/cards/components/CardSearchField';
 import { searchCards } from '@/features/cards/search-cards';
 import { useDeckCards } from '@/features/cards/use-deck-cards';
@@ -26,14 +28,16 @@ import { useTrashAction } from '@/features/trash/use-trash-action';
 import { useHeldValue } from '@/hooks/use-held-value';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
-import { space } from '@/theme/tokens';
+import { space, toastHold } from '@/theme/tokens';
 import { goBack } from '@/utils/go-back';
 
 // 덱 상세(Deck-1, Deck-2, Deck-4). 메뉴의 덱 삭제는 확인 없이 덱을 카드와 함께 휴지통으로 보낸다(복구할 수 있다).
 export default function DeckScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, retry } = useDeck(id);
-  const cards = useDeckCards(id, state.kind === 'ready');
+  // 카드를 휴지통으로 보내거나 되돌린 뒤 목록을 다시 읽는다.
+  const [version, reload] = useReducer((count: number) => count + 1, 0);
+  const cards = useDeckCards(id, state.kind === 'ready', version);
   const loadNotice = state.kind === 'failed' || state.kind === 'missing' ? state.kind : null;
   const shownLoadNotice = useHeldValue(loadNotice);
   const { colors } = useTheme();
@@ -43,11 +47,34 @@ export default function DeckScreen() {
     () => store.trashDeck(id),
     () => goBack('/'),
   );
+  // 밀어서 휴지통으로 보낸 카드. 되돌리기 토스트가 떠 있는 동안만 있다.
+  const [trashedCardId, setTrashedCardId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<ViewInstance>(null);
   const [query, setQuery] = useState('');
 
   const addCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });
+  const trashCard = async (cardId: string) => {
+    await store.trashCard(cardId);
+    setTrashedCardId(cardId);
+    reload();
+  };
+  const undoTrash = async () => {
+    const cardId = trashedCardId;
+    setTrashedCardId(null);
+    if (cardId === null) return;
+    try {
+      await store.restoreCard(cardId);
+    } finally {
+      reload();
+    }
+  };
+  // 토스트는 저절로 사라진다. 같은 토스트가 또 오면 머무는 시간을 다시 센다.
+  useEffect(() => {
+    if (trashedCardId === null) return;
+    const timer = setTimeout(() => setTrashedCardId(null), toastHold.plain);
+    return () => clearTimeout(timer);
+  }, [trashedCardId]);
   const openCard = (cardId: string) =>
     router.push({ pathname: '/card/[id]', params: { id: cardId } });
   const startReview = () => router.push({ pathname: '/review/[deckId]', params: { deckId: id } });
@@ -118,7 +145,7 @@ export default function DeckScreen() {
               <View style={styles.search}>
                 <CardSearchField value={query} onChangeText={setQuery} />
               </View>
-              <CardList cards={cards.cards} query={query} onOpen={openCard} />
+              <CardList cards={cards.cards} query={query} onOpen={openCard} onTrash={trashCard} />
             </>
           )}
           <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
@@ -140,6 +167,9 @@ export default function DeckScreen() {
             )}
           </View>
         </>
+      ) : null}
+      {trashedCardId !== null ? (
+        <Toast message="휴지통으로 옮겼어요" action={{ label: '되돌리기', onPress: undoTrash }} />
       ) : null}
       <Sheet
         visible={menuOpen && state.kind === 'ready'}
@@ -185,9 +215,10 @@ interface CardListProps {
   cards: { id: string; front: string; back: string; hint: string | null; memo: string | null }[];
   query: string;
   onOpen: (cardId: string) => void;
+  onTrash: (cardId: string) => Promise<void>;
 }
 
-function CardList({ cards, query, onOpen }: CardListProps) {
+function CardList({ cards, query, onOpen, onTrash }: CardListProps) {
   const { colors, text } = useTheme();
   const searching = query.trim() !== '';
   const shown = searchCards(cards, query);
@@ -221,14 +252,19 @@ function CardList({ cards, query, onOpen }: CardListProps) {
               {/* 휴지통으로 옮긴 카드는 페이드로 빠지고 아래 행이 올라온다. 검색으로 걸러질 때는 움직이지 않는다. */}
               {shown.map((card, index) => (
                 <ExitingRow key={card.id} animated={!searching}>
-                  <CardRow
-                    front={card.front}
-                    back={card.back}
-                    status="신규"
-                    highlight={query}
-                    onPress={() => onOpen(card.id)}
-                    last={index === shown.length - 1}
-                  />
+                  <SwipeToTrash label={card.front} onTrash={() => onTrash(card.id)}>
+                    {(guard) => (
+                      <CardRow
+                        front={card.front}
+                        back={card.back}
+                        status="신규"
+                        highlight={query}
+                        onPress={guard(() => onOpen(card.id))}
+                        onTrash={() => onTrash(card.id)}
+                        last={index === shown.length - 1}
+                      />
+                    )}
+                  </SwipeToTrash>
                 </ExitingRow>
               ))}
             </View>

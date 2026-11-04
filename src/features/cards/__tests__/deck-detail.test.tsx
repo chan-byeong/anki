@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Text } from 'react-native';
-import { userEvent } from '@testing-library/react-native';
+import { fireEvent, userEvent } from '@testing-library/react-native';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import NewCardScreen from '@/app/card/new';
@@ -104,6 +104,61 @@ describe('덱 상세', () => {
     const back = screen.getByText(LONG_BACK);
     expect(front.props.numberOfLines).toBeUndefined();
     expect(back.props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe('덱 상세: 휴지통으로 옮기기', () => {
+  // 밀어서 휴지통과 같은 일을 스크린 리더 동작으로도 할 수 있다.
+  const trashWithAction = (row: ReturnType<typeof screen.getByLabelText>) =>
+    fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'trash' } });
+
+  test('카드 행의 휴지통 동작으로 옮기면 목록에서 빠지고 되돌리기 토스트가 뜬다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(deck.id, { front: 'apple', back: '사과' });
+    await store.createCard(deck.id, { front: 'pear', back: '배' });
+    await renderApp(store, `/deck/${deck.id}`);
+
+    await trashWithAction(screen.getByLabelText('apple, 사과'));
+    await act(async () => {});
+
+    expect((await store.listCards(deck.id)).map((card) => card.front)).toEqual(['pear']);
+    expect(screen.getByText('휴지통으로 옮겼어요')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '되돌리기' })).toBeOnTheScreen();
+    expect(screen.getByText('카드 1장 · 오늘 1장')).toBeOnTheScreen();
+  });
+
+  test('되돌리기를 누르면 카드가 목록으로 돌아오고 토스트가 사라진다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(deck.id, { front: 'apple', back: '사과' });
+    await renderApp(store, `/deck/${deck.id}`);
+    const user = setupUser();
+
+    await trashWithAction(screen.getByLabelText('apple, 사과'));
+    await act(async () => {});
+    await user.press(screen.getByRole('button', { name: '되돌리기' }));
+    await act(async () => {});
+
+    expect((await store.listCards(deck.id)).map((card) => card.front)).toEqual(['apple']);
+    expect(screen.getByText('카드 1장 · 오늘 1장')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: '되돌리기' })).toBeNull();
+  });
+
+  test('토스트는 3초 뒤에 저절로 사라진다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(deck.id, { front: 'apple', back: '사과' });
+    await renderApp(store, `/deck/${deck.id}`);
+
+    await trashWithAction(screen.getByLabelText('apple, 사과'));
+    await act(async () => {});
+    expect(screen.getByRole('button', { name: '되돌리기' })).toBeOnTheScreen();
+
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+    expect(screen.queryByRole('button', { name: '되돌리기' })).toBeNull();
   });
 });
 
