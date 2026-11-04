@@ -2,15 +2,15 @@ import { isWorkletFunction } from 'react-native-worklets';
 
 import { trashSwipeZone } from '@/features/cards/swipe-trash';
 
-// 행 너비 342px 기준: 열림 88px, 바로 휴지통은 60% = 205.2px.
+// 행 너비 342px 기준: 열림 76px, 바로 휴지통은 60% = 205.2px.
 describe('밀어서 휴지통', () => {
-  test('88px를 못 넘기면 닫힌다', () => {
+  test('76px를 못 넘기면 닫힌다', () => {
     expect(trashSwipeZone(0, 342)).toBe('close');
-    expect(trashSwipeZone(-87, 342)).toBe('close');
+    expect(trashSwipeZone(-75, 342)).toBe('close');
   });
 
-  test('88px를 넘기고 60%를 못 넘기면 휴지통 버튼이 열린 채 멈춘다', () => {
-    expect(trashSwipeZone(-88, 342)).toBe('open');
+  test('76px를 넘기고 60%를 못 넘기면 휴지통 버튼이 열린 채 멈춘다', () => {
+    expect(trashSwipeZone(-76, 342)).toBe('open');
     expect(trashSwipeZone(-205, 342)).toBe('open');
   });
 
