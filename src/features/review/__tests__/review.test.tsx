@@ -131,7 +131,9 @@ describe('복습 화면: 평가', () => {
         hintUsed: false,
       });
       expect(await screen.findByText('pear')).toBeOnTheScreen();
-      expect(screen.getByText(`${remaining}장 남음`)).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText(remaining === 1 ? '마지막 한 장' : `남은 카드 ${remaining}장`),
+      ).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: '정답 확인' })).toBeOnTheScreen();
       expect(screen.queryByText('배')).toBeNull();
       expect(screen.queryByLabelText('평가')).toBeNull();
@@ -298,7 +300,7 @@ describe('복습 화면: 복습 끝', () => {
       expect(within(results).queryAllByRole('image')).toHaveLength(0);
       expect(screen.queryByRole('button', { name: '복습 닫기' })).toBeNull();
       expect(screen.queryByLabelText('평가')).toBeNull();
-      expect(screen.queryByText(/장 남음/)).toBeNull();
+      expect(screen.queryByLabelText(/남은 카드|마지막 한 장/)).toBeNull();
       expect(screen.queryByText(`/deck/${deck.id}`)).toBeNull();
 
       await user.press(screen.getByRole('button', { name: '덱 목록으로' }));
@@ -319,7 +321,7 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     expect(await screen.findByText('apple')).toBeOnTheScreen();
     expect(screen.queryByText('사과')).toBeNull();
     expect(screen.queryByText('pear')).toBeNull();
-    expect(screen.getByText('2장 남음')).toBeOnTheScreen();
+    expect(screen.getByLabelText('남은 카드 2장')).toBeOnTheScreen();
     expect(screen.getByText('영어 단어')).toBeOnTheScreen();
     expect(
       screen.getByText('카드를 눌러 정답 보기', { includeHiddenElements: true }),
@@ -393,7 +395,7 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     await renderApp(store, `/review/${deck.id}`);
 
     expect(screen.getByText('pear')).toBeOnTheScreen();
-    expect(screen.getByText('1장 남음')).toBeOnTheScreen();
+    expect(screen.getByLabelText('마지막 한 장')).toBeOnTheScreen();
   });
 
   test('덱이 없거나 휴지통에 있으면 안내한다', async () => {
@@ -443,7 +445,7 @@ describe('복습 화면: 앞면과 정답 확인', () => {
     await user.press(await screen.findByRole('button', { name: '복습 닫기' }));
 
     expect(await screen.findByRole('header', { name: '덱' })).toBeOnTheScreen();
-    expect(screen.queryByText('2장 남음')).toBeNull();
+    expect(screen.queryByLabelText('남은 카드 2장')).toBeNull();
   });
 });
 
