@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, CheckIcon, Field, Notice, TopBar } from '@/components';
+import { Button, CheckIcon, Collapsible, Field, Notice, TopBar } from '@/components';
 import { StoreError, type Deck } from '@/storage/store';
 import { saveFailureMessage } from '@/features/storage-status/storage-status';
+import { useHeldValue } from '@/hooks/use-held-value';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
@@ -81,6 +82,7 @@ export function DeckForm({ deck }: { deck?: Deck }) {
   const [language, setLanguage] = useState(deck?.language ?? null);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const shownFailure = useHeldValue(failure);
   const [missing, setMissing] = useState(false);
   const submitting = useRef(false);
   const active = useRef(true);
@@ -190,13 +192,14 @@ export function DeckForm({ deck }: { deck?: Deck }) {
           </Text>
         ) : null}
       </View>
-      {failure ? (
+      {/* 저장 실패 Notice는 높이를 열며 나타나고, 다시 저장하면 접힌다. 접히는 동안 마지막 문구를 보인다. */}
+      <Collapsible open={failure !== null}>
         <Notice
           tone="danger"
           title={editing ? '덱을 저장하지 못했어요' : '덱을 만들지 못했어요'}
-          body={failure}
+          body={shownFailure ?? ''}
         />
-      ) : null}
+      </Collapsible>
     </DeckFormFrame>
   );
 }

@@ -5,7 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Button,
+  Collapsible,
   EditIcon,
+  ExitingRow,
+  FadeSwap,
   MoreIcon,
   Notice,
   PageHeader,
@@ -20,6 +23,7 @@ import { searchCards } from '@/features/cards/search-cards';
 import { useDeckCards } from '@/features/cards/use-deck-cards';
 import { useDeck } from '@/features/decks/use-deck';
 import { useTrashAction } from '@/features/trash/use-trash-action';
+import { useHeldValue } from '@/hooks/use-held-value';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
@@ -30,6 +34,8 @@ export default function DeckScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, retry } = useDeck(id);
   const cards = useDeckCards(id, state.kind === 'ready');
+  const loadNotice = state.kind === 'failed' || state.kind === 'missing' ? state.kind : null;
+  const shownLoadNotice = useHeldValue(loadNotice);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const store = useStore();
@@ -74,27 +80,34 @@ export default function DeckScreen() {
         }
       />
       <PageHeader title={state.kind === 'ready' ? state.deck.name : '덱 상세'} caption={caption} />
-      {trashFailed ? (
+      {/* Notice는 높이를 열며 나타나고, 풀리면 접힌다. 접히는 동안에는 마지막 문구를 그대로 보인다. */}
+      <Collapsible open={trashFailed}>
         <View style={styles.notice}>
           <Notice tone="danger" title="덱을 삭제하지 못했어요" body="잠시 뒤 다시 해 주세요." />
         </View>
-      ) : null}
-      {state.kind === 'failed' || state.kind === 'missing' ? (
-        <View style={styles.notice}>
-          <Notice
-            tone={state.kind === 'failed' ? 'danger' : 'info'}
-            title={
-              state.kind === 'failed' ? '덱을 불러오지 못했어요' : '덱이 없거나 휴지통에 있어요'
-            }
-            action={state.kind === 'failed' ? { label: '다시 시도', onPress: retry } : undefined}
-          />
-        </View>
-      ) : null}
-      {state.kind === 'ready' && cards.kind === 'failed' ? (
+      </Collapsible>
+      <Collapsible open={loadNotice !== null}>
+        {shownLoadNotice !== null ? (
+          <View style={styles.notice}>
+            <Notice
+              tone={shownLoadNotice === 'failed' ? 'danger' : 'info'}
+              title={
+                shownLoadNotice === 'failed'
+                  ? '덱을 불러오지 못했어요'
+                  : '덱이 없거나 휴지통에 있어요'
+              }
+              action={
+                shownLoadNotice === 'failed' ? { label: '다시 시도', onPress: retry } : undefined
+              }
+            />
+          </View>
+        ) : null}
+      </Collapsible>
+      <Collapsible open={state.kind === 'ready' && cards.kind === 'failed'}>
         <View style={styles.notice}>
           <Notice tone="danger" title="카드를 불러오지 못했어요" body="덱을 다시 열어 주세요." />
         </View>
-      ) : null}
+      </Collapsible>
       {/* 처음 읽는 동안에는 비워 둔다. 빈 상태가 잠깐 보였다 사라지지 않게 하기 위해서다. */}
       {state.kind === 'ready' && cards.kind === 'ready' ? (
         <>
@@ -187,33 +200,41 @@ function CardList({ cards, query, onOpen }: CardListProps) {
           style={[text('caption'), styles.count, { color: colors.muted }]}
         >{`${shown.length}장`}</Text>
       ) : null}
-      {shown.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={text('title', { weight: 'bold' })}>검색 결과가 없어요</Text>
-          <Text style={[text('body'), { color: colors.muted }]}>다른 검색어로 찾아보세요.</Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.fill}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          <View accessibilityRole="list" accessibilityLabel={searching ? '검색 결과' : '카드 목록'}>
-            {shown.map((card, index) => (
-              <CardRow
-                key={card.id}
-                front={card.front}
-                back={card.back}
-                status="신규"
-                highlight={query}
-                onPress={() => onOpen(card.id)}
-                last={index === shown.length - 1}
-              />
-            ))}
+      {/* 검색 결과가 0개가 되면 빈 안내가 페이드로 들어온다. 행은 움직이지 않는다. */}
+      <FadeSwap swapKey={shown.length === 0 ? 'none' : 'list'} style={styles.fill}>
+        {shown.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={text('title', { weight: 'bold' })}>검색 결과가 없어요</Text>
+            <Text style={[text('body'), { color: colors.muted }]}>다른 검색어로 찾아보세요.</Text>
           </View>
-        </ScrollView>
-      )}
+        ) : (
+          <ScrollView
+            style={styles.fill}
+            contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <View
+              accessibilityRole="list"
+              accessibilityLabel={searching ? '검색 결과' : '카드 목록'}
+            >
+              {/* 휴지통으로 옮긴 카드는 페이드로 빠지고 아래 행이 올라온다. 검색으로 걸러질 때는 움직이지 않는다. */}
+              {shown.map((card, index) => (
+                <ExitingRow key={card.id} animated={!searching}>
+                  <CardRow
+                    front={card.front}
+                    back={card.back}
+                    status="신규"
+                    highlight={query}
+                    onPress={() => onOpen(card.id)}
+                    last={index === shown.length - 1}
+                  />
+                </ExitingRow>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+      </FadeSwap>
     </>
   );
 }

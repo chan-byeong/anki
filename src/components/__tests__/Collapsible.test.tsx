@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { getAnimatedStyle } from 'react-native-reanimated';
 
 import { Collapsible } from '@/components/motion/Collapsible';
@@ -71,6 +71,36 @@ const renderOpen = async () => {
   await layout(CONTENT_HEIGHT);
   return utils;
 };
+
+// 안쪽 뷰가 바깥 높이와 상관없이 제 높이를 갖는지. 흐름 안에 두면 Yoga가 높이 0인 부모에 맞춰 0으로 재서 열리지 않는다.
+const measuresFreely = () =>
+  StyleSheet.flatten(screen.getByTestId('box-content', { includeHiddenElements: true }).props.style)
+    ?.position === 'absolute';
+
+describe('Collapsible: 높이 재기', () => {
+  it('닫힌 채로 시작해 열면 안쪽 뷰를 부모 높이에서 떼어 잰다', async () => {
+    const { rerender } = await render(ui(false));
+    await rerender(ui(true));
+
+    expect(measuresFreely()).toBe(true);
+  });
+
+  it('다 열리면 안쪽 뷰를 흐름으로 돌린다', async () => {
+    const { rerender } = await render(ui(false));
+    await rerender(ui(true));
+    await layout(CONTENT_HEIGHT);
+    await advance(motionEnter);
+
+    expect(measuresFreely()).toBe(false);
+  });
+
+  it('접는 동안에는 다시 안쪽 뷰를 떼어 둔다', async () => {
+    const { rerender } = await renderOpen();
+    await rerender(ui(false));
+
+    expect(measuresFreely()).toBe(true);
+  });
+});
 
 describe('Collapsible: 처음 그릴 때', () => {
   it('닫혀 있으면 내용을 그리지 않는다', async () => {

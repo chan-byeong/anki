@@ -11,7 +11,7 @@ import { createStore, type Rating, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
-import type { ThemeName } from '@/theme/tokens';
+import { motion, motionEnter, type ThemeName } from '@/theme/tokens';
 
 // 홈에서 덱을 눌러 복습을 여는 흐름을 실제 라우터 위에서 메모리 Store로 돌린다(deck-list.test.tsx와 같은 방식).
 // 덱 상세는 도착한 경로를 글자로 보여 주는 자리로 바꾼다.
@@ -240,6 +240,34 @@ describe('복습 화면: 앞면 자리', () => {
     await user.press(screen.getByRole('button', { name: '정답 확인' }));
     expect(screen.getByText('사과')).toBeOnTheScreen();
     expect(front()).toHaveStyle({ marginTop: 196 });
+  });
+
+  test('메모를 다시 누르면 칸이 바로 스크린 리더에서 숨고, 접힘(160ms)이 끝나면 사라진다', async () => {
+    const store = newStore();
+    const deck = await store.createDeck({ name: '영어 단어' });
+    await store.createCard(deck.id, { front: 'apple', back: '사과', memo: 'an apple a day' });
+    await renderApp(store, `/review/${deck.id}`);
+    const user = setupUser();
+
+    await user.press(screen.getByRole('button', { name: '메모 열기' }));
+    // 기기에서는 칸이 마운트되면 높이를 재고 열기 시작한다.
+    await fireEvent(screen.getByTestId('review-memo-content'), 'layout', {
+      nativeEvent: { layout: { height: 80 } },
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(motionEnter);
+    });
+    expect(screen.getByText('an apple a day')).toBeOnTheScreen();
+
+    // user.press는 누르는 시간만큼 타이머를 돌려 접힘이 끝나 버린다. 시점을 보려고 바로 누른다.
+    await fireEvent.press(screen.getByRole('button', { name: '메모 닫기' }));
+    expect(screen.queryByText('an apple a day')).toBeNull();
+    expect(screen.getByText('an apple a day', { includeHiddenElements: true })).toBeOnTheScreen();
+
+    await act(async () => {
+      jest.advanceTimersByTime(motion);
+    });
+    expect(screen.queryByText('an apple a day', { includeHiddenElements: true })).toBeNull();
   });
 });
 

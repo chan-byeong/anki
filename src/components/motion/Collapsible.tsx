@@ -113,7 +113,7 @@ function CollapsiblePanel({
     () =>
       fixedHeight
         ? { height: progress.value * (measuredHeight ?? 0), opacity: progress.value }
-        : { opacity: progress.value },
+        : { height: 'auto', opacity: progress.value },
     [fixedHeight, measuredHeight],
   );
 
@@ -126,6 +126,7 @@ function CollapsiblePanel({
       <View
         testID={testID ? `${testID}-content` : undefined}
         onLayout={onLayout}
+        style={fixedHeight ? styles.measuring : undefined}
         // 접기 시작하는 순간 스크린리더에서 숨긴다.
         aria-hidden={!open}
       >
@@ -138,4 +139,6 @@ function CollapsiblePanel({
 const styles = StyleSheet.create({
   // 높이가 줄어드는 동안 내용이 삐져나오지 않게 한다.
   clip: { overflow: 'hidden' },
+  // 움직이는 동안 안쪽 뷰를 부모 높이에서 뗀다. 흐름 안에 두면 Yoga가 overflow hidden인 높이 0 부모에 맞춰 0으로 재서 열리지 않는다.
+  measuring: { position: 'absolute', top: 0, left: 0, right: 0 },
 });

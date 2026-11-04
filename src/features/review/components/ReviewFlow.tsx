@@ -1,3 +1,6 @@
+import { StyleSheet } from 'react-native';
+
+import { FadeSwap } from '@/components';
 import { ReviewBar } from '@/features/review/components/ReviewBar';
 import { ReviewCard } from '@/features/review/components/ReviewCard';
 import { ReviewDone } from '@/features/review/components/ReviewDone';
@@ -17,28 +20,33 @@ export function ReviewFlow({ deckIds, cards, insetBottom }: ReviewFlowProps) {
   // 복습이 끝났을 때 저장된 이력으로 센다.
   const tomorrowCount = useTomorrowCount(deckIds, !progress.card);
 
-  if (!progress.card) {
-    return (
-      <ReviewDone
-        ratings={progress.ratings}
-        tomorrowCount={tomorrowCount}
-        insetBottom={insetBottom}
-      />
-    );
-  }
-
+  // 마지막 평가 뒤 더미가 비면 "오늘 복습 끝"이 같은 자리에 페이드로 들어온다. 폭죽·숫자 올라가기는 없다.
   return (
-    <>
-      <ReviewBar remaining={progress.remaining} />
-      <ReviewCard
-        // 같은 카드가 재등장해도 새 앞면으로 시작한다. 순서와 남은 수는 nextCardAfterRating의 결과만 쓴다.
-        key={progress.ratings.length}
-        card={progress.card}
-        insetBottom={insetBottom}
-        onRate={rate}
-        ratingDisabled={saving}
-        pendingRating={pendingRating}
-      />
-    </>
+    <FadeSwap swapKey={progress.card ? 'review' : 'done'} style={styles.fill}>
+      {progress.card ? (
+        <>
+          <ReviewBar remaining={progress.remaining} />
+          <ReviewCard
+            // 같은 카드가 재등장해도 새 앞면으로 시작한다. 순서와 남은 수는 nextCardAfterRating의 결과만 쓴다.
+            key={progress.ratings.length}
+            card={progress.card}
+            insetBottom={insetBottom}
+            onRate={rate}
+            ratingDisabled={saving}
+            pendingRating={pendingRating}
+          />
+        </>
+      ) : (
+        <ReviewDone
+          ratings={progress.ratings}
+          tomorrowCount={tomorrowCount}
+          insetBottom={insetBottom}
+        />
+      )}
+    </FadeSwap>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});

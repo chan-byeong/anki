@@ -8,8 +8,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
+import { FadeSwap } from '@/components';
 import { HandProvider } from '@/features/settings/HandProvider';
 import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
 import { useMotion } from '@/hooks/use-motion';
@@ -96,14 +98,21 @@ export default function RootLayout() {
           판단은 useMotion(useReducedMotion)이 하므로 라이브러리 처리는 끈다(ADR 0020). */}
       <ReducedMotionConfig mode={ReduceMotion.Never} />
       <HandProvider storage={kvStore}>
-        {storeState.kind === 'open' ? (
-          <StoreProvider store={storeState.store}>
-            <ThemedStack />
-          </StoreProvider>
-        ) : (
-          <StorageErrorScreen onRetry={retry} retrying={retrying} />
-        )}
+        {/* 저장소 오류 화면과 앱은 160ms 페이드로 바꿔 끼운다. */}
+        <FadeSwap swapKey={storeState.kind} style={styles.fill}>
+          {storeState.kind === 'open' ? (
+            <StoreProvider store={storeState.store}>
+              <ThemedStack />
+            </StoreProvider>
+          ) : (
+            <StorageErrorScreen onRetry={retry} retrying={retrying} />
+          )}
+        </FadeSwap>
       </HandProvider>
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});
