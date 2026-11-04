@@ -22,12 +22,15 @@ interface RatingButtonsProps {
   onRate: (rating: Rating) => void;
   disabled: boolean;
   pendingRating: Rating | null;
+  // 밀어서 평가하는 중 문턱을 넘은 쪽. 그 버튼이 눌린 색으로 뒤집힌다.
+  armed?: Rating | null;
 }
 
 export function RatingButtons({
   onRate,
   disabled: allDisabled,
   pendingRating,
+  armed = null,
 }: RatingButtonsProps) {
   return (
     <View role="group" accessibilityLabel="평가" style={styles.ratings}>
@@ -38,6 +41,7 @@ export function RatingButtons({
           label={label}
           disabled={allDisabled || (pendingRating !== null && pendingRating !== rating)}
           selected={pendingRating === rating}
+          armed={armed === rating}
           onPress={() => onRate(rating)}
         />
       ))}
@@ -50,13 +54,14 @@ interface RatingButtonProps {
   label: string;
   disabled: boolean;
   selected: boolean;
+  armed: boolean;
   onPress: () => void;
 }
 
 const EASE_OUT = Easing.bezier(...easeOut);
 const EASE_IN = Easing.bezier(...easeIn);
 
-function RatingButton({ kind, label, disabled, selected, onPress }: RatingButtonProps) {
+function RatingButton({ kind, label, disabled, selected, armed, onPress }: RatingButtonProps) {
   const { colors } = useTheme();
   const { motion, pressScale, pickScale } = useMotion();
   const { progress, onPressIn, onPressOut } = usePressProgress();
@@ -89,7 +94,7 @@ function RatingButton({ kind, label, disabled, selected, onPress }: RatingButton
     >
       {({ pressed }) => {
         // 누르는 동안과 고른 뒤에는 배경을 평가색으로, 마크를 반전색으로 뒤집는다(STA-152).
-        const inverted = pressed || selected;
+        const inverted = pressed || selected || armed;
         return (
           <Animated.View
             style={[

@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
 import { FadeSwap } from '@/components';
@@ -93,23 +94,26 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <ThemeProvider storage={kvStore}>
-      {/* reanimated는 동작 줄이기가 켜지면 애니메이션을 건너뛰지만, 명세는 160ms 페이드를 남긴다.
+    // 제스처(밀어서 평가, 밀어서 휴지통)는 앱 전체를 이 뿌리 뷰 아래에서 받는다.
+    <GestureHandlerRootView style={styles.fill}>
+      <ThemeProvider storage={kvStore}>
+        {/* reanimated는 동작 줄이기가 켜지면 애니메이션을 건너뛰지만, 명세는 160ms 페이드를 남긴다.
           판단은 useMotion(useReducedMotion)이 하므로 라이브러리 처리는 끈다(ADR 0020). */}
-      <ReducedMotionConfig mode={ReduceMotion.Never} />
-      <HandProvider storage={kvStore}>
-        {/* 저장소 오류 화면과 앱은 160ms 페이드로 바꿔 끼운다. */}
-        <FadeSwap swapKey={storeState.kind} style={styles.fill}>
-          {storeState.kind === 'open' ? (
-            <StoreProvider store={storeState.store}>
-              <ThemedStack />
-            </StoreProvider>
-          ) : (
-            <StorageErrorScreen onRetry={retry} retrying={retrying} />
-          )}
-        </FadeSwap>
-      </HandProvider>
-    </ThemeProvider>
+        <ReducedMotionConfig mode={ReduceMotion.Never} />
+        <HandProvider storage={kvStore}>
+          {/* 저장소 오류 화면과 앱은 160ms 페이드로 바꿔 끼운다. */}
+          <FadeSwap swapKey={storeState.kind} style={styles.fill}>
+            {storeState.kind === 'open' ? (
+              <StoreProvider store={storeState.store}>
+                <ThemedStack />
+              </StoreProvider>
+            ) : (
+              <StorageErrorScreen onRetry={retry} retrying={retrying} />
+            )}
+          </FadeSwap>
+        </HandProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

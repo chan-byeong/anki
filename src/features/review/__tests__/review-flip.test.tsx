@@ -8,6 +8,7 @@ import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { motion, shift } from '@/theme/tokens';
+import { haptic } from '@/utils/haptics';
 
 // jest-expo의 네이티브 UUID 기본 모의는 undefined를 반환하므로 난수 경계만 대체한다.
 jest.mock('expo-crypto', () => ({
@@ -15,6 +16,9 @@ jest.mock('expo-crypto', () => ({
 }));
 // 덱 이름은 화면 포커스(라우터)에 묶여 있어서 이 테스트의 관심 밖이다.
 jest.mock('@/features/decks/use-deck-name', () => ({ useDeckName: () => '영어 단어' }));
+jest.mock('@/utils/haptics', () => ({
+  haptic: { rate: jest.fn(), select: jest.fn(), threshold: jest.fn() },
+}));
 // 시스템 설정 구독은 useReducedMotion의 일이라 여기서는 그 값만 바꾼다.
 const mockReducedMotion = { current: false };
 jest.mock('@/hooks/use-reduced-motion', () => ({
@@ -82,6 +86,16 @@ const rate = async (name: string) => {
 };
 
 describe('평가 연출', () => {
+  test('평가를 고르면 햅틱이 한 번 울린다', async () => {
+    const { store, deck, cards } = await seed(2);
+    await renderFlow(store, deck.id, cards);
+    jest.mocked(haptic.rate).mockClear();
+
+    await press('앎');
+
+    expect(haptic.rate).toHaveBeenCalledTimes(1);
+  });
+
   test('평가를 누르면 카드가 위로 8px 가며 160ms에 사라지고, 그동안 평가는 다시 눌리지 않는다', async () => {
     const { store, deck, cards } = await seed(2);
     const rated = store.rateCard.bind(store);

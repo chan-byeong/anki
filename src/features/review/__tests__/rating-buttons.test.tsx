@@ -14,9 +14,9 @@ const advance = (ms: number) =>
     jest.advanceTimersByTime(ms);
   });
 
-const ui = (pendingRating: Rating | null) => (
+const ui = (pendingRating: Rating | null, armed: Rating | null = null) => (
   <ThemeProvider override="light">
-    <RatingButtons onRate={() => {}} disabled={false} pendingRating={pendingRating} />
+    <RatingButtons onRate={() => {}} disabled={false} pendingRating={pendingRating} armed={armed} />
   </ThemeProvider>
 );
 
@@ -70,5 +70,17 @@ describe('평가 버튼 누름', () => {
     expect(face('앎')).toHaveAnimatedStyle({ transform: [{ scale: 1 }] });
     expect(mark('앎')).toHaveAnimatedStyle({ transform: [{ scale: 1 }] });
     expect(screen.getByRole('button', { name: '앎', selected: true })).toBeOnTheScreen();
+  });
+});
+
+describe('밀어서 평가 문턱', () => {
+  test('문턱을 넘은 쪽 버튼만 평가색으로 뒤집히고, 손을 떼면 돌아온다', async () => {
+    const { rerender } = await render(ui(null, 'know'));
+
+    expect(face('앎')).toHaveStyle({ backgroundColor: '#1E7A4C' });
+    expect(face('모름')).toHaveStyle({ backgroundColor: '#F4F4F5' });
+
+    await rerender(ui(null, null));
+    expect(face('앎')).toHaveStyle({ backgroundColor: '#F4F4F5' });
   });
 });
