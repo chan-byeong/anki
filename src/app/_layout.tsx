@@ -14,6 +14,7 @@ import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
 import { FadeSwap } from '@/components';
 import { HandProvider } from '@/features/settings/HandProvider';
+import { LogoSplash } from '@/features/splash/components/LogoSplash';
 import { StorageErrorScreen } from '@/features/storage-status/components/StorageErrorScreen';
 import { useMotion } from '@/hooks/use-motion';
 import { screenTransition, type ScreenTransition } from '@/navigation/screen-transitions';
@@ -87,11 +88,13 @@ export default function RootLayout() {
     openStore().finally(() => setRetrying(false));
   };
 
+  // 로고가 그려지면 네이티브 스플래시를 거둔다. 로고가 못 그려져도 준비가 끝나면 거둔다.
+  const hideNativeSplash = () => {
+    SplashScreen.hideAsync().catch(() => {});
+  };
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
+    if (ready) hideNativeSplash();
   }, [ready]);
-
-  if (!ready) return null;
 
   return (
     // 제스처(밀어서 평가, 밀어서 휴지통)는 앱 전체를 이 뿌리 뷰 아래에서 받는다.
@@ -101,9 +104,12 @@ export default function RootLayout() {
           판단은 useMotion(useReducedMotion)이 하므로 라이브러리 처리는 끈다(ADR 0020). */}
         <ReducedMotionConfig mode={ReduceMotion.Never} />
         <HandProvider storage={kvStore}>
-          {/* 저장소 오류 화면과 앱은 160ms 페이드로 바꿔 끼운다. */}
-          <FadeSwap swapKey={storeState.kind} style={styles.fill}>
-            {storeState.kind === 'open' ? (
+          {/* 로고(첫 장 놓기)·저장소 오류 화면·앱은 160ms 페이드로 바꿔 끼운다.
+              로고 모션은 준비를 기다리는 동안만 돈다. 준비가 먼저 끝나면 모션이 안 끝나도 바로 넘어간다. */}
+          <FadeSwap swapKey={ready ? storeState.kind : 'splash'} style={styles.fill}>
+            {!ready ? (
+              <LogoSplash onShown={hideNativeSplash} />
+            ) : storeState.kind === 'open' ? (
               <StoreProvider store={storeState.store}>
                 <ThemedStack />
               </StoreProvider>
