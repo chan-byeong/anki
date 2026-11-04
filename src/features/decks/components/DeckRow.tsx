@@ -91,9 +91,15 @@ export function DeckRow({
   const pressOut = () => {
     fill.value = withTiming(0, { duration: press, easing: EASE_MOVE });
   };
+  // 선택 모드가 바뀌면 행이 다시 만들어져, 누르고 있던 행에는 onPressOut이 오지 않는다. 바탕을 여기서 되돌린다.
+  useEffect(() => {
+    fill.value = withTiming(0, { duration: press, easing: EASE_MOVE });
+  }, [selecting, press, fill]);
   const fillStyle = useAnimatedStyle(() => ({ opacity: fill.value }));
   const fillLayer = (
     <Animated.View
+      // 카드 없는 덱은 선택 전후로 바깥 View가 그대로라, key가 없으면 선택 칸 뷰를 이 바탕이 물려받아 칸의 너비가 남는다.
+      key="fill"
       testID="deck-row-pressed"
       pointerEvents="none"
       style={[styles.touch, { backgroundColor: colors.surface }, fillStyle]}
@@ -153,7 +159,7 @@ export function DeckRow({
           accessibilityLabel={`${name}, ${total}`}
           style={[styles.row, { borderBottomColor: colors.line, borderBottomWidth: last ? 0 : 1 }]}
         >
-          <Animated.View style={columnStyle} />
+          <Animated.View key="column" style={[styles.check, columnStyle]} />
           <View style={styles.main}>{body}</View>
         </View>
       );
@@ -175,7 +181,7 @@ export function DeckRow({
         style={[styles.row, { borderBottomColor: colors.line, borderBottomWidth: last ? 0 : 1 }]}
       >
         {fillLayer}
-        <Animated.View style={[styles.check, columnStyle]}>
+        <Animated.View key="column" style={[styles.check, columnStyle]}>
           <Animated.View style={dotStyle}>
             {selected ? (
               <View style={[styles.circle, { backgroundColor: colors.text }]}>
@@ -195,7 +201,7 @@ export function DeckRow({
     <View style={[styles.row, { borderBottomColor: colors.line, borderBottomWidth: last ? 0 : 1 }]}>
       {fillLayer}
       {/* 선택을 끝낼 때 접히는 선택 원 칸. 다 접히면 너비 0이다. */}
-      <Animated.View aria-hidden style={[styles.check, columnStyle]} />
+      <Animated.View key="column" aria-hidden style={[styles.check, columnStyle]} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
