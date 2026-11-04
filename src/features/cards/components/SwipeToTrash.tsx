@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -39,6 +39,9 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
   const zone = useSharedValue<0 | 1 | 2>(0);
   // 열린 채 멈춘 시작점. 열린 행을 다시 밀 때 여기서부터 따라간다.
   const base = useSharedValue(0);
+  // 휴지통으로 간 뒤 행이 스스로 사라지는 정도(0~1). 목록의 빠짐 움직임이 안 돌아도 빨간 칸이 남지 않게 한다.
+  const gone = useSharedValue(0);
+  const height = useSharedValue(0);
   const [open, setOpen] = useState(false);
 
   const buzz = () => haptic.threshold();
@@ -56,12 +59,14 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
     offset.value = withTiming(-width.value, { duration: motion, easing: EASE_IN });
     try {
       await onTrash();
+      gone.value = withTiming(1, { duration: motion, easing: EASE_IN });
     } catch {
       close();
     }
   };
 
   const pan = usePanGesture({
+    testID: 'swipe-to-trash-pan',
     // 가로로 12px 움직여야 시작한다. 세로로 먼저 움직이면 목록 스크롤에 양보한다.
     activeOffsetX: [-12, 12],
     failOffsetY: [-12, 12],
@@ -97,6 +102,10 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
   const actionStyle = useAnimatedStyle(() => ({ width: -offset.value }));
+  const rootStyle = useAnimatedStyle(() => ({
+    opacity: 1 - gone.value,
+    height: gone.value === 0 ? 'auto' : height.value * (1 - gone.value),
+  }));
 
   const guard = (press: () => void) => () => {
     if (open) close();
@@ -104,7 +113,14 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
   };
 
   return (
-    <View onLayout={(event) => (width.value = event.nativeEvent.layout.width)} style={styles.root}>
+    <Animated.View
+      testID="swipe-to-trash"
+      onLayout={(event) => {
+        width.value = event.nativeEvent.layout.width;
+        if (gone.value === 0) height.value = event.nativeEvent.layout.height;
+      }}
+      style={[styles.root, rootStyle]}
+    >
       {/* 밀수록 드러나는 휴지통 자리. 행 뒤에 깔려 있고, 닫혀 있으면 스크린 리더에서 숨는다. */}
       <Animated.View
         aria-hidden={!open}
@@ -125,7 +141,7 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
           {children(guard)}
         </Animated.View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 }
 
