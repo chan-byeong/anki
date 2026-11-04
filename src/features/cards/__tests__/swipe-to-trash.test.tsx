@@ -52,6 +52,13 @@ function rootOf() {
 }
 
 describe('SwipeToTrash 사라짐', () => {
+  // 캔버스(UX · 밀어서 휴지통): 휴지통 아이콘 아래에 "휴지통" 글자가 함께 있다.
+  test('휴지통 칸에는 아이콘과 함께 글자가 있다', async () => {
+    await renderRow(() => Promise.resolve());
+
+    expect(screen.getByText('휴지통', { includeHiddenElements: true })).toBeTruthy();
+  });
+
   test('휴지통에 보내고 나면 행이 투명해지고 높이가 0으로 접힌다', async () => {
     const onTrash = jest.fn(() => Promise.resolve());
     await renderRow(onTrash);

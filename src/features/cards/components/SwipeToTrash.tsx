@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -13,9 +13,11 @@ import { TrashIcon } from '@/components';
 import { TRASH_OPEN_WIDTH, trashSwipeZone } from '@/features/cards/swipe-trash';
 import { useMotion } from '@/hooks/use-motion';
 import { useTheme } from '@/theme/ThemeProvider';
-import { easeIn, easeOut } from '@/theme/tokens';
+import { easeIn, easeOut, radius, space } from '@/theme/tokens';
 import { haptic } from '@/utils/haptics';
 
+// 밀어서 열린 휴지통 칸과 행 사이의 간격.
+const GAP = space[2];
 const EASE_OUT = Easing.bezier(...easeOut);
 const EASE_IN = Easing.bezier(...easeIn);
 
@@ -32,7 +34,7 @@ interface SwipeToTrashProps {
 // 88px 넘기면 버튼이 열린 채 멈추고, 행 너비의 60%를 넘겨 놓으면 바로 휴지통으로 간다.
 // 문턱을 넘는 순간 햅틱이 한 번 울린다. 같은 일을 하는 버튼(열린 휴지통 버튼, 스크린 리더 동작)이 따로 있다.
 export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
-  const { colors } = useTheme();
+  const { colors, text } = useTheme();
   const { motion } = useMotion();
   const offset = useSharedValue(0);
   const width = useSharedValue(0);
@@ -101,7 +103,8 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
   });
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
-  const actionStyle = useAnimatedStyle(() => ({ width: -offset.value }));
+  // 빨간 칸은 행에서 GAP만큼 떨어져 드러난다. 행의 끝 글자가 빨간 칸에 붙지 않게 한다.
+  const actionStyle = useAnimatedStyle(() => ({ width: Math.max(-offset.value - GAP, 0) }));
   const rootStyle = useAnimatedStyle(() => ({
     opacity: 1 - gone.value,
     height: gone.value === 0 ? 'auto' : height.value * (1 - gone.value),
@@ -133,7 +136,8 @@ export function SwipeToTrash({ label, onTrash, children }: SwipeToTrashProps) {
           onPress={commit}
           style={styles.button}
         >
-          <TrashIcon color={colors.inverse} size={22} />
+          <TrashIcon color={colors.inverse} size={20} />
+          <Text style={[text('caption', { weight: 'bold' }), { color: colors.inverse }]}>휴지통</Text>
         </Pressable>
       </Animated.View>
       <GestureDetector gesture={pan}>
@@ -149,11 +153,18 @@ const styles = StyleSheet.create({
   root: { overflow: 'hidden' },
   action: {
     position: 'absolute',
-    top: 0,
+    top: space[1],
     right: 0,
-    bottom: 0,
+    bottom: space[1],
     alignItems: 'flex-end',
     overflow: 'hidden',
+    borderRadius: radius.sm,
   },
-  button: { width: TRASH_OPEN_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center' },
+  button: {
+    width: TRASH_OPEN_WIDTH - GAP,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[1],
+  },
 });
