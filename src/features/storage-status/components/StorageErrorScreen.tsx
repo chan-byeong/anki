@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlertCircleIcon, Button } from '@/components';
+import { useDelayedPending } from '@/hooks/use-delayed-pending';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
@@ -14,6 +15,8 @@ interface StorageErrorScreenProps {
 export function StorageErrorScreen({ onRetry, retrying }: StorageErrorScreenProps) {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
+  // 버튼은 누르자마자 잠그고, 300ms가 넘게 걸릴 때만 기다린다는 글자를 띄운다(최소 400ms). 캔버스에 이 상태의 아트보드는 없다.
+  const waiting = useDelayedPending(retrying);
 
   return (
     <View
@@ -33,7 +36,11 @@ export function StorageErrorScreen({ onRetry, retrying }: StorageErrorScreenProp
         </Text>
       </View>
       <View style={styles.footer}>
-        <Button label="다시 시도" onPress={onRetry} disabled={retrying} />
+        <Button
+          label={waiting ? '다시 여는 중' : '다시 시도'}
+          onPress={onRetry}
+          disabled={retrying}
+        />
       </View>
     </View>
   );

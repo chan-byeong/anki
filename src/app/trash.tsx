@@ -9,7 +9,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, ListSection, Notice, PageHeader, Sheet, Toast, TopBar } from '@/components';
+import {
+  Button,
+  Collapsible,
+  ExitingRow,
+  FadeSwap,
+  ListSection,
+  Notice,
+  PageHeader,
+  Sheet,
+  Toast,
+  TopBar,
+} from '@/components';
 import { formatDeletedAgo } from '@/features/trash/format-deleted-ago';
 import { TrashRow } from '@/features/trash/components/TrashRow';
 import { useTrash, type TrashedCard } from '@/features/trash/use-trash';
@@ -53,7 +64,11 @@ export default function TrashScreen() {
   const { colors, text } = useTheme();
   const insets = useSafeAreaInsets();
   const { state, reload } = useTrash();
-  const actions = useTrashActions(reload);
+  // 시트가 다 닫힌 뒤에 목록을 다시 읽는다. 시트가 내려가는 움직임과 행이 빠지는 움직임이 겹치지 않게 한다.
+  const closing = useRef<Promise<void>>(Promise.resolve());
+  const actions = useTrashActions(() => {
+    void closing.current.then(reload);
+  });
   const headingRef = useRef<TextInstance>(null);
   // 시트가 닫혀도 대상과 트리거를 남긴다. 내려가는 동안 문구가 비지 않고, 닫힐 때 트리거로 포커스를 돌려준다(ADR 0007).
   const [item, setItem] = useState<{
@@ -99,6 +114,7 @@ export default function TrashScreen() {
     closed: Promise<void>,
     card?: TrashedCard,
   ) => {
+    closing.current = closed;
     const [outcome] = await Promise.all([result, closed]);
     if (outcome === 'done' && headingRef.current) moveFocus(headingRef.current);
     if (outcome === 'blocked' && card) {
@@ -133,7 +149,7 @@ export default function TrashScreen() {
         title="휴지통"
         caption="자동으로 비워지지 않아요. 복구하거나 직접 지워 주세요."
       />
-      {state.kind === 'failed' ? (
+      <Collapsible open={state.kind === 'failed'}>
         <View style={styles.notice}>
           <Notice
             tone="danger"
@@ -141,52 +157,62 @@ export default function TrashScreen() {
             body="잠시 뒤 다시 열어 주세요."
           />
         </View>
-      ) : null}
-      {empty ? (
-        <View style={styles.empty}>
-          <Text style={text('title', { weight: 'bold' })}>휴지통이 비어 있어요</Text>
-          <Text style={[text('body'), { color: colors.muted }]}>
-            지운 카드와 덱은 여기에 모여요.
-          </Text>
-        </View>
-      ) : null}
-      {state.kind === 'ready' && !empty ? (
-        <ScrollView style={styles.fill} contentContainerStyle={styles.list}>
-          {state.decks.length > 0 ? (
-            <ListSection label={`덱 ${state.decks.length}`}>
-              {state.decks.map((deck, index) => (
-                <TrashRow
-                  key={deck.id}
-                  deck
-                  title={deck.name}
-                  sub={`덱 · 카드 ${deck.cardCount}장과 함께 · ${formatDeletedAgo(deck.deletedAt, state.now)}`}
-                  last={index === state.decks.length - 1}
-                  onOpen={open({ kind: 'deck', deck })}
-                  onRestore={open({ kind: 'deck', deck })}
-                />
-              ))}
-            </ListSection>
-          ) : null}
-          {state.cards.length > 0 ? (
-            <ListSection label={`카드 ${state.cards.length}`}>
-              {state.cards.map((card, index) => (
-                <TrashRow
-                  key={card.id}
-                  title={card.front}
-                  sub={[card.back, card.deckName, formatDeletedAgo(card.deletedAt, state.now)]
-                    .filter((part) => part !== '')
-                    .join(' · ')}
-                  last={index === state.cards.length - 1}
-                  onOpen={open({ kind: 'card', card })}
-                  onRestore={(trigger) =>
-                    restore({ kind: 'card', card }, trigger, Promise.resolve())
-                  }
-                />
-              ))}
-            </ListSection>
-          ) : null}
-        </ScrollView>
-      ) : null}
+      </Collapsible>
+      {/* 휴지통을 비우면 목록 전체가 페이드로 나가고 빈 상태가 페이드로 들어온다. */}
+      <FadeSwap swapKey={empty ? 'empty' : 'list'} style={styles.fill}>
+        {empty ? (
+          <View style={styles.empty}>
+            <Text style={text('title', { weight: 'bold' })}>휴지통이 비어 있어요</Text>
+            <Text style={[text('body'), { color: colors.muted }]}>
+              지운 카드와 덱은 여기에 모여요.
+            </Text>
+          </View>
+        ) : null}
+        {state.kind === 'ready' && !empty ? (
+          <ScrollView style={styles.fill} contentContainerStyle={styles.list}>
+            {/* 복구·영구 삭제한 행은 시트가 다 닫힌 뒤 페이드로 빠지고, 아래 행과 구역이 올라온다. */}
+            {state.decks.length > 0 ? (
+              <ExitingRow>
+                <ListSection label={`덱 ${state.decks.length}`}>
+                  {state.decks.map((deck, index) => (
+                    <ExitingRow key={deck.id}>
+                      <TrashRow
+                        deck
+                        title={deck.name}
+                        sub={`덱 · 카드 ${deck.cardCount}장과 함께 · ${formatDeletedAgo(deck.deletedAt, state.now)}`}
+                        last={index === state.decks.length - 1}
+                        onOpen={open({ kind: 'deck', deck })}
+                        onRestore={open({ kind: 'deck', deck })}
+                      />
+                    </ExitingRow>
+                  ))}
+                </ListSection>
+              </ExitingRow>
+            ) : null}
+            {state.cards.length > 0 ? (
+              <ExitingRow>
+                <ListSection label={`카드 ${state.cards.length}`}>
+                  {state.cards.map((card, index) => (
+                    <ExitingRow key={card.id}>
+                      <TrashRow
+                        title={card.front}
+                        sub={[card.back, card.deckName, formatDeletedAgo(card.deletedAt, state.now)]
+                          .filter((part) => part !== '')
+                          .join(' · ')}
+                        last={index === state.cards.length - 1}
+                        onOpen={open({ kind: 'card', card })}
+                        onRestore={(trigger) =>
+                          restore({ kind: 'card', card }, trigger, Promise.resolve())
+                        }
+                      />
+                    </ExitingRow>
+                  ))}
+                </ListSection>
+              </ExitingRow>
+            ) : null}
+          </ScrollView>
+        ) : null}
+      </FadeSwap>
       {state.kind === 'ready' && !empty ? (
         <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
           <Button

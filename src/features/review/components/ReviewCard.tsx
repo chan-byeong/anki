@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { HintIcon, IconButton, MemoIcon } from '@/components';
+import { Collapsible, FadeSwap, HintIcon, IconButton, MemoIcon } from '@/components';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import { RatingButtons } from '@/features/review/components/RatingButtons';
 import { useFrontAnchor } from '@/features/review/use-front-anchor';
@@ -115,21 +115,18 @@ export function ReviewCard({
                 </Text>
               </View>
               {/* 열리기 전부터 있는 라이브 영역이다. 내용이 들어오면 웹 스크린 리더가 읽는다(웹은 announceForAccessibility가 동작하지 않는다). */}
-              <View
-                testID="review-answer"
-                aria-live="polite"
-                style={revealed ? styles.answer : undefined}
-              >
-                {revealed ? (
-                  <>
+              <View testID="review-answer" aria-live="polite">
+                {/* 정답 공개: 구분선과 뒷면이 높이를 열며 나타난다(240ms easeOut). 앞면은 위 여백으로 굳혀 두어 움직이지 않는다. */}
+                <Collapsible open={revealed} testID="review-back">
+                  <View style={styles.answer}>
                     <View aria-hidden style={[styles.divider, { backgroundColor: colors.line }]} />
                     <View accessible accessibilityLabel={`뒷면 ${card.back}`}>
                       <Text style={[text('title', { weight: 'bold' }), styles.center]}>
                         {card.back}
                       </Text>
                     </View>
-                  </>
-                ) : null}
+                  </View>
+                </Collapsible>
               </View>
             </ScrollView>
           </Pressable>
@@ -141,30 +138,35 @@ export function ReviewCard({
               onLayout={(event) => setExtrasHeight(event.nativeEvent.layout.height)}
             >
               {/* 칸은 카드 아래쪽에 겹쳐 뜬다. 흐름 안에 두면 열 때마다 앞면이 위로 밀린다(STA-152).
-                  캔버스에는 메모 칸(Review-2)만 있어 힌트 칸도 같은 모양으로 둔다. */}
-              {hintShown ? (
-                <View
-                  role="region"
-                  accessibilityLabel="힌트"
-                  style={[styles.panel, { backgroundColor: colors.bg }]}
-                >
-                  <Text style={text('body')}>{card.hint}</Text>
-                  {hintUsed ? (
-                    <Text style={[text('caption'), { color: colors.muted }]}>
-                      힌트로 기록됩니다
-                    </Text>
-                  ) : null}
+                  캔버스에는 메모 칸(Review-2)만 있어 힌트 칸도 같은 모양으로 둔다.
+                  칸은 아이콘 바로 위에서 높이를 열며 나타나고, 다시 누르면 접힌다. */}
+              <Collapsible open={hintShown} testID="review-hint">
+                <View style={styles.panelSlot}>
+                  <View
+                    role="region"
+                    accessibilityLabel="힌트"
+                    style={[styles.panel, { backgroundColor: colors.bg }]}
+                  >
+                    <Text style={text('body')}>{card.hint}</Text>
+                    {hintUsed ? (
+                      <Text style={[text('caption'), { color: colors.muted }]}>
+                        힌트로 기록됩니다
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
-              ) : null}
-              {memoShown ? (
-                <View
-                  role="region"
-                  accessibilityLabel="메모"
-                  style={[styles.panel, { backgroundColor: colors.bg }]}
-                >
-                  <Text style={text('body')}>{card.memo}</Text>
+              </Collapsible>
+              <Collapsible open={memoShown} testID="review-memo">
+                <View style={styles.panelSlot}>
+                  <View
+                    role="region"
+                    accessibilityLabel="메모"
+                    style={[styles.panel, { backgroundColor: colors.bg }]}
+                  >
+                    <Text style={text('body')}>{card.memo}</Text>
+                  </View>
                 </View>
-              ) : null}
+              </Collapsible>
               <View
                 testID="review-extra-buttons"
                 style={[styles.extraButtons, hand === 'left' ? styles.leftHand : styles.rightHand]}
@@ -201,17 +203,20 @@ export function ReviewCard({
         </View>
       </View>
       <View style={[styles.footer, { paddingBottom: space[2] + insetBottom }]}>
-        {revealed ? (
-          <RatingButtons
-            onRate={(rating) => onRate(rating, hintUsed)}
-            disabled={ratingDisabled}
-            pendingRating={pendingRating}
-          />
-        ) : (
-          <Text aria-hidden style={[text('caption'), { color: colors.muted }]}>
-            카드를 눌러 정답 보기
-          </Text>
-        )}
+        {/* 정답을 열면 안내 글자가 사라지고 평가 버튼이 같은 자리에 페이드로 들어온다. */}
+        <FadeSwap swapKey={revealed ? 'rating' : 'guide'} style={styles.footerContent}>
+          {revealed ? (
+            <RatingButtons
+              onRate={(rating) => onRate(rating, hintUsed)}
+              disabled={ratingDisabled}
+              pendingRating={pendingRating}
+            />
+          ) : (
+            <Text aria-hidden style={[text('caption'), { color: colors.muted }]}>
+              카드를 눌러 정답 보기
+            </Text>
+          )}
+        </FadeSwap>
       </View>
     </>
   );
@@ -228,8 +233,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: space[2],
     paddingBottom: space[2],
-    gap: space[2],
   },
+  // 칸 아래 간격(space-2)을 열리는 높이 안에 둔다. 부모 gap으로 두면 접힘이 끝나는 순간 간격만큼 튄다.
+  panelSlot: { paddingBottom: space[2] },
   panel: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
   // 캔버스의 아이콘 세로 줄(간격 space-3)에 힌트 버튼을 메모 버튼 위에 더한다.
   // 캔버스(Review-1~3의 hand)는 줄을 손 쪽 모서리에 두고 메모 버튼만 그쪽으로 space-4 띄운다.
@@ -246,7 +252,8 @@ const styles = StyleSheet.create({
     paddingBottom: CONTENT_BOTTOM,
   },
   contentCentered: { justifyContent: 'center' },
-  answer: { marginTop: space[4], gap: space[4] },
+  // 위 여백도 열리는 높이에 넣는다. 바깥 여백으로 두면 열기 전부터 자리가 생긴다.
+  answer: { paddingTop: space[4], gap: space[4] },
   center: { textAlign: 'center' },
   divider: { alignSelf: 'center', width: 32, height: 1 },
   footer: {
@@ -256,4 +263,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  footerContent: { alignSelf: 'stretch', alignItems: 'center' },
 });

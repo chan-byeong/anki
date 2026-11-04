@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Notice, PageHeader, TopBar } from '@/components';
+import { Collapsible, Notice, PageHeader, TopBar } from '@/components';
 import { RatingDistribution } from '@/features/stats/components/RatingDistribution';
 import { ReviewCalendar } from '@/features/stats/components/ReviewCalendar';
 import { ReviewForecast } from '@/features/stats/components/ReviewForecast';
@@ -23,11 +23,11 @@ export default function StatsScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + space[3] }}>
         <PageHeader title="통계" />
         {/* 처음 읽는 동안에는 비워 둔다. 빈 상태가 잠깐 보였다 사라지지 않게 하기 위해서다. */}
-        {stats.kind === 'failed' ? (
+        <Collapsible open={stats.kind === 'failed'}>
           <View style={styles.body}>
             <Notice tone="danger" title="통계를 불러오지 못했어요" body="앱을 다시 열어 주세요." />
           </View>
-        ) : null}
+        </Collapsible>
         {stats.kind === 'ready' && stats.total === 0 ? (
           <View style={styles.body}>
             <Text style={text('body', { weight: 'bold' })}>아직 복습한 기록이 없어요</Text>

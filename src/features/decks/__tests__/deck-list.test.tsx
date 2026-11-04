@@ -10,10 +10,16 @@ import { createStore, type Store } from '@/storage/store';
 import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
+import { motionHold } from '@/theme/tokens';
+import { haptic } from '@/utils/haptics';
 
 // 홈과 덱 만들기를 실제 라우터 위에서 메모리 Store로 돌린다. 앱의 _layout은 SQLite를 열므로 쓰지 않는다.
 // 덱 상세와 복습은 도착한 경로를 글자로 보여 주는 자리로 바꾼다. expo-router의 getPathname·toHavePathname은
 // RNTL v14의 비동기 render와 맞지 않아 쓰지 않는다.
+// 길게 눌러 선택이 잡힌 순간의 햅틱만 센다.
+jest.mock('@/utils/haptics', () => ({
+  haptic: { rate: jest.fn(), select: jest.fn(), threshold: jest.fn() },
+}));
 jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
@@ -202,6 +208,21 @@ describe('여러 덱 선택', () => {
     const empty = await store.createDeck({ name: '빈 덱' });
     return { store, words, dev, empty };
   };
+
+  test('덱 행을 400ms 누르면 선택이 시작되고, 그 순간 햅틱이 한 번 울린다', async () => {
+    const { store } = await seedDecks();
+    await renderApp(store);
+    const user = setupUser();
+    jest.mocked(haptic.select).mockClear();
+
+    // RN의 기본 판정(500ms)이 아니라 명세의 400ms에 잡혀야 한다.
+    await user.longPress(
+      screen.getByRole('button', { name: '개발 지식 복습 시작, 오늘 복습 끝, 전체 3장' }),
+      { duration: motionHold },
+    );
+    expect(screen.getByRole('header', { name: '1개 선택' })).toBeOnTheScreen();
+    expect(haptic.select).toHaveBeenCalledTimes(1);
+  });
 
   test('오늘 끝난 덱을 길게 눌러 선택을 시작하고, 고른 덱의 모든 카드 수를 더한다', async () => {
     const { store, words, dev } = await seedDecks();

@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Field, Notice, TopBar, TrashIcon } from '@/components';
+import { Button, Collapsible, Field, Notice, TopBar, TrashIcon } from '@/components';
 import { useCard } from '@/features/cards/use-card';
 import { useTrashAction } from '@/features/trash/use-trash-action';
 import { useDeckName } from '@/features/decks/use-deck-name';
+import { useHeldValue } from '@/hooks/use-held-value';
 import type { Card } from '@/storage/store';
 import { saveFailureMessage } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
@@ -21,6 +22,8 @@ const close = () => goBack('/');
 export default function EditCardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useCard(id);
+  const loadNotice = state.kind === 'failed' || state.kind === 'missing' ? state.kind : null;
+  const shownLoadNotice = useHeldValue(loadNotice);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const store = useStore();
@@ -47,22 +50,27 @@ export default function EditCardScreen() {
             : []
         }
       />
-      {trashFailed ? (
+      {/* Notice는 높이를 열며 나타나고, 풀리면 접힌다. 접히는 동안에는 마지막 문구를 그대로 보인다. */}
+      <Collapsible open={trashFailed}>
         <View style={styles.notice}>
           <Notice tone="danger" title="카드를 삭제하지 못했어요" body="잠시 뒤 다시 해 주세요." />
         </View>
-      ) : null}
+      </Collapsible>
       {state.kind === 'ready' ? <EditForm card={state.card} /> : null}
-      {state.kind === 'missing' || state.kind === 'failed' ? (
-        <View style={styles.notice}>
-          <Notice
-            tone={state.kind === 'failed' ? 'danger' : 'info'}
-            title={
-              state.kind === 'failed' ? '카드를 불러오지 못했어요' : '카드가 없거나 휴지통에 있어요'
-            }
-          />
-        </View>
-      ) : null}
+      <Collapsible open={loadNotice !== null}>
+        {shownLoadNotice !== null ? (
+          <View style={styles.notice}>
+            <Notice
+              tone={shownLoadNotice === 'failed' ? 'danger' : 'info'}
+              title={
+                shownLoadNotice === 'failed'
+                  ? '카드를 불러오지 못했어요'
+                  : '카드가 없거나 휴지통에 있어요'
+              }
+            />
+          </View>
+        ) : null}
+      </Collapsible>
     </KeyboardAvoidingView>
   );
 }
@@ -82,6 +90,7 @@ function EditForm({ card }: EditFormProps) {
   const [memo, setMemo] = useState(card.memo ?? '');
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const shownFailure = useHeldValue(failure);
   const missing = front.trim() === '' || back.trim() === '';
   const canSave = !missing && !saving;
 
@@ -126,7 +135,9 @@ function EditForm({ card }: EditFormProps) {
         <Field label="뒷면" multiline value={back} onChangeText={setBack} />
         <Field label="힌트" optional multiline value={hint} onChangeText={setHint} />
         <Field label="메모" optional multiline value={memo} onChangeText={setMemo} />
-        {failure ? <Notice tone="danger" title="카드를 저장하지 못했어요" body={failure} /> : null}
+        <Collapsible open={failure !== null}>
+          <Notice tone="danger" title="카드를 저장하지 못했어요" body={shownFailure ?? ''} />
+        </Collapsible>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
         <Button label="저장" onPress={save} disabled={!canSave} />
