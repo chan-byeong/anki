@@ -1,4 +1,7 @@
 export { Button, type ButtonSize, type ButtonVariant } from './Button';
+export { Collapsible } from './motion/Collapsible';
+export { CountText } from './motion/CountText';
+export { FadeSwap } from './motion/FadeSwap';
 export { Field } from './Field';
 export { IconButton, type IconButtonProps, type IconButtonTone } from './IconButton';
 export * from './icons';
