@@ -13,6 +13,7 @@ const FAILURE_TEXT: Record<FileFailure, string> = {
   'too-many-lines': `줄이 너무 많아요 · 최대 ${MAX_LINES.toLocaleString('ko-KR')}줄`,
   'unsupported-type': '.md, .txt, .tsv 파일만 읽을 수 있어요',
   'open-failed': '파일을 열지 못했어요',
+  'picker-unavailable': '파일 선택기를 열 수 없어요 · 앱을 다시 설치해 주세요',
 };
 
 /**

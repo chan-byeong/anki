@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useEffect } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,6 +16,14 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 import { goBack } from '@/utils/go-back';
 
+// 네이티브 스택이 화면 전환이 끝날 때 보내는 이벤트. 기본 타입에는 없어서 쓰는 모양만 적는다.
+interface TransitionNavigation {
+  addListener: (
+    type: 'transitionEnd',
+    listener: (event: { data: { closing: boolean } }) => void,
+  ) => () => void;
+}
+
 // 파일로 가져오기(Import-2 미리보기, Import-3 카드 없음). 들어오면 바로 파일 선택기를 연다(Import-1은 덱 상세의 시트).
 // 끝나면 덱 상세로 돌아가 토스트를 띄운다(Import-4). 캔버스에 없는 상태(파일을 못 읽음, 너무 큼, 저장 실패, 덱 바꾸기)는
 // 기존 Notice·Sheet로 만들었다.
@@ -27,15 +35,27 @@ export default function ImportScreen() {
   const shownSaveFailure = useHeldValue(flow.saveFailure);
   const { pick } = flow;
 
-  // 처음 한 번만 파일 선택기를 연다. 고르지 않고 닫으면 이 화면도 닫는다.
-  const opened = useRef(false);
+  // 화면이 다 올라온 뒤에 파일 선택기를 연다. iOS는 전환 중인 화면 위에 선택기를 못 띄우고 취소로 돌려준다.
+  // 전환 이벤트가 오지 않는 경우(움직임 줄이기 등)를 위해 시간이 지나면 연다. 고르지 않고 닫아도 화면은 남기고,
+  // "파일 고르기" 버튼으로 다시 연다.
+  const navigation = useNavigation() as unknown as TransitionNavigation;
   useEffect(() => {
-    if (opened.current) return;
-    opened.current = true;
-    void pick().then((picked) => {
-      if (!picked) goBack('/');
+    let done = false;
+    const open = () => {
+      if (done) return;
+      done = true;
+      void pick();
+    };
+    const unsubscribe = navigation.addListener('transitionEnd', (event) => {
+      if (!event.data.closing) open();
     });
-  }, [pick]);
+    const fallback = setTimeout(open, 800);
+    return () => {
+      done = true;
+      unsubscribe();
+      clearTimeout(fallback);
+    };
+  }, [navigation, pick]);
 
   const finish = async () => {
     const count = await flow.save();
@@ -61,7 +81,7 @@ export default function ImportScreen() {
       {flow.file !== null && flow.outcome !== null ? (
         <ImportBody flow={flow} fileName={flow.file.name} outcome={flow.outcome} />
       ) : (
-        <View style={styles.fill} />
+        <NoFile />
       )}
       <Collapsible open={flow.saveFailure !== null}>
         <View style={styles.notice}>
@@ -71,6 +91,19 @@ export default function ImportScreen() {
       <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
         <ImportAction flow={flow} outcome={flow.outcome} onAdd={finish} />
       </View>
+    </View>
+  );
+}
+
+// 아직 파일을 고르지 않았거나 고르지 않고 닫았을 때. 버튼은 아래 "파일 고르기"다.
+function NoFile() {
+  const { colors, text } = useTheme();
+
+  return (
+    <View style={styles.noFile}>
+      <Text style={[text('body'), { color: colors.muted }]}>
+        한 줄에 카드 한 장, 칸은 탭으로 나눈 파일을 읽을 수 있어요.
+      </Text>
     </View>
   );
 }
@@ -145,7 +178,10 @@ interface ImportActionProps {
 
 // 아래 버튼: 카드를 못 찾았거나 읽을 수 없으면 "다른 파일 선택", 미리보기가 있으면 "카드 M장 추가".
 function ImportAction({ flow, outcome, onAdd }: ImportActionProps) {
-  if (outcome === null || outcome.kind === 'loading' || flow.fronts.kind === 'failed') return null;
+  if (outcome === null) {
+    return <Button label="파일 고르기" onPress={flow.pick} disabled={flow.picking} />;
+  }
+  if (outcome.kind === 'loading' || flow.fronts.kind === 'failed') return null;
   if (outcome.kind === 'guide') {
     return <Button label="다른 파일 선택" onPress={flow.pick} disabled={flow.picking} />;
   }
@@ -161,6 +197,7 @@ function ImportAction({ flow, outcome, onAdd }: ImportActionProps) {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   fill: { flex: 1 },
+  noFile: { flex: 1, paddingTop: space[4], paddingHorizontal: space[4] },
   notice: { paddingHorizontal: space[4], paddingBottom: space[2] },
   listHeader: { marginHorizontal: space[4], marginTop: space[3] },
   listContent: { paddingHorizontal: space[4] },
