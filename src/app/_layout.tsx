@@ -39,6 +39,7 @@ const SCREENS: { name: string; transition: ScreenTransition }[] = [
   { name: 'deck/[id]/edit', transition: 'modal' },
   { name: 'card/new', transition: 'modal' },
   { name: 'card/[id]', transition: 'modal' },
+  { name: 'import', transition: 'modal' },
 ];
 
 function ThemedStack() {

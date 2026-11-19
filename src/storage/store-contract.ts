@@ -149,6 +149,84 @@ export const describeStoreContract = (
       });
     });
 
+    describe('카드 여러 장 만들기', () => {
+      test('한 번에 만든 카드는 넘긴 순서대로 덱의 목록에 보인다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+
+        const cards = await store.createCards(deck.id, [
+          { front: 'apple', back: '사과', memo: '과일', hint: '빨갛다' },
+          { front: 'pear', back: '배' },
+          { front: 'plum', back: '자두' },
+        ]);
+
+        // 목록은 만든 시각 순서라서, 한 번에 만든 카드도 시각이 1ms씩 달라야 넘긴 순서가 남는다.
+        expect(cards.map(({ front, createdAt }) => [front, createdAt])).toEqual([
+          ['apple', 2000],
+          ['pear', 2001],
+          ['plum', 2002],
+        ]);
+        expect(cards[0]).toEqual({
+          id: cards[0]?.id,
+          deckId: deck.id,
+          front: 'apple',
+          back: '사과',
+          memo: '과일',
+          hint: '빨갛다',
+          image: null,
+          createdAt: 2000,
+        });
+        expect(await store.listCards(deck.id)).toEqual(cards);
+        expect(new Set(cards.map(({ id }) => id)).size).toBe(3);
+      });
+
+      test('만든 카드는 직접 만든 카드와 같게 고치고 휴지통에 넣을 수 있다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        const [apple, pear] = await store.createCards(deck.id, [
+          { front: 'apple', back: '사과' },
+          { front: 'pear', back: '배' },
+        ]);
+
+        await store.updateCard(apple!.id, { back: '애플' });
+        await store.trashCard(pear!.id);
+
+        expect((await store.listCards(deck.id)).map(({ front, back }) => [front, back])).toEqual([
+          ['apple', '애플'],
+        ]);
+        expect(await store.countCardsByDeck()).toEqual({ [deck.id]: 1 });
+      });
+
+      test('빈 앞면·뒷면이 하나라도 있으면 거부하고 한 장도 만들지 않는다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+
+        await expect(
+          store.createCards(deck.id, [
+            { front: 'apple', back: '사과' },
+            { front: 'pear', back: '배' },
+            { front: 'plum', back: ' ' },
+          ]),
+        ).rejects.toMatchObject({ code: 'invalid' });
+
+        expect(await store.listCards(deck.id)).toEqual([]);
+      });
+
+      test('없거나 휴지통에 있는 덱에는 거부하고 한 장도 만들지 않는다', async () => {
+        const { store } = await harness.open();
+        const deck = await store.createDeck({ name: '영어 단어' });
+        await store.trashDeck(deck.id);
+
+        await expect(
+          store.createCards(deck.id, [{ front: 'apple', back: '사과' }]),
+        ).rejects.toMatchObject({ code: 'trashed' });
+        await expect(
+          store.createCards('없는 덱', [{ front: 'apple', back: '사과' }]),
+        ).rejects.toMatchObject({ code: 'not_found' });
+        expect(await store.countTrash()).toBe(1);
+      });
+    });
+
     describe('다시 열기', () => {
       test('저장소를 닫았다가 다시 열어도 덱, 카드, 학습 이력이 그대로다', async () => {
         const first = await harness.open();
