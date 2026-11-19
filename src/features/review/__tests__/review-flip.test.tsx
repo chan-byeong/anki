@@ -16,6 +16,8 @@ jest.mock('expo-crypto', () => ({
 }));
 // 덱 이름은 화면 포커스(라우터)에 묶여 있어서 이 테스트의 관심 밖이다.
 jest.mock('@/features/decks/use-deck-name', () => ({ useDeckName: () => '영어 단어' }));
+jest.mock('@/features/decks/use-deck-language', () => ({ useDeckLanguage: () => null }));
+jest.mock('@/utils/speech', () => ({ speech: { speak: jest.fn(), stop: jest.fn() } }));
 jest.mock('@/utils/haptics', () => ({
   haptic: { rate: jest.fn(), select: jest.fn(), threshold: jest.fn() },
 }));
