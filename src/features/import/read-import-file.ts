@@ -1,3 +1,5 @@
+import type { CreateCardInput } from '@/storage/store';
+
 import { decodeText } from './decode-text';
 
 // 탭으로 나눈 줄을 카드로 읽는 규칙(STA-166). 파일 선택·저장과 상관없이 바이트와 덱의 앞면 목록만으로 결과가 정해진다.
@@ -73,3 +75,7 @@ export function readImportFile(
   });
   return { ok: true, cards, skipped };
 }
+
+/** 읽은 카드를 Store에 넘기는 모양으로 바꾼다(줄 번호는 저장하지 않는다). */
+export const toCardInputs = (cards: readonly ImportCard[]): CreateCardInput[] =>
+  cards.map(({ front, back, memo, hint }) => ({ front, back, memo, hint }));
