@@ -25,8 +25,6 @@ jest.mock('@/utils/haptics', () => ({
 // 실제 음성은 기기에서만 난다. 화면이 무엇을 읽으라고 하는지만 본다.
 jest.mock('@/utils/speech', () => ({ speech: { speak: jest.fn(), stop: jest.fn() } }));
 
-// 복습 중 발음 재생(STA-127): 누를 때만 읽고, 덱에 발음 언어가 없으면 버튼이 없다.
-
 beforeEach(() => {
   jest.useFakeTimers();
   mockDeckLanguage.current = 'ja';
@@ -68,6 +66,7 @@ const renderFlow = async (store: Store, deckId: string, cards: Card[]) => {
 const speakButton = () => screen.queryByRole('button', { name: '발음 재생' });
 const user = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
+// 복습 중 발음 재생(STA-127): 누를 때만 읽고, 덱에 발음 언어가 없으면 버튼이 없다.
 describe('복습 화면의 발음 재생', () => {
   test('덱의 발음 언어가 있으면 앞면 화면에 발음 버튼이 있고, 열기만 해서는 읽지 않는다', async () => {
     const { store, deck, cards } = await seed([{ front: '食べる', back: '먹다' }]);
@@ -114,6 +113,36 @@ describe('복습 화면의 발음 재생', () => {
     const corner = screen.getByTestId('review-extra-buttons');
     expect(within(corner).getByRole('button', { name: '발음 재생' })).toBeOnTheScreen();
     expect(within(corner).getByRole('button', { name: '메모 열기' })).toBeOnTheScreen();
+  });
+
+  test('발음 버튼은 줄의 맨 아래에 있고 손 쪽으로 띄우는 힌트·메모 묶음 밖에 있다', async () => {
+    const { store, deck, cards } = await seed([{ front: '食べる', back: '먹다', memo: 'る동사' }]);
+    await renderFlow(store, deck.id, cards);
+
+    const hintMemo = screen.getByTestId('review-hint-memo-buttons');
+    expect(within(hintMemo).queryByRole('button', { name: '발음 재생' })).not.toBeOnTheScreen();
+    const names = within(screen.getByTestId('review-extra-buttons'))
+      .getAllByRole('button')
+      .map((button) => button.props.accessibilityLabel);
+    expect(names).toEqual(['메모 열기', '발음 재생']);
+  });
+
+  test('다크 테마에서도 발음 버튼이 있고 읽는다', async () => {
+    const { store, deck, cards } = await seed([{ front: '食べる', back: '먹다' }]);
+    await render(
+      <ThemeProvider override="dark">
+        <HandProvider>
+          <StoreProvider store={store}>
+            <ReviewFlow deckIds={[deck.id]} cards={cards} insetBottom={0} />
+          </StoreProvider>
+        </HandProvider>
+      </ThemeProvider>,
+    );
+    await advance(1);
+
+    await user().press(speakButton()!);
+
+    expect(speech.speak).toHaveBeenCalledWith('食べる', 'ja');
   });
 
   test('메모·힌트가 없는 카드에서도 발음 버튼만 그 모서리에 있다', async () => {

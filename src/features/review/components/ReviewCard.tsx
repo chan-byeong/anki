@@ -78,10 +78,16 @@ export function ReviewCard({
   // 발음 버튼은 덱에 발음 언어가 있을 때만 나온다. 누를 때만 읽고 저절로 읽지 않는다(STA-127).
   const language = useDeckLanguage(card.deckId);
   const target = pronunciationTarget(card, language);
+  // lang·accessibilityLanguage에는 없음을 null이 아니라 undefined로 넘긴다.
+  const languageAttribute = language ?? undefined;
   // 카드가 넘어가거나 화면을 떠나면 읽던 소리를 멈춘다. 카드마다 새로 만들어지므로 한 번만 건다.
   useEffect(() => speech.stop, []);
   // 힌트·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
   const { hand } = useHand();
+  const handStyle =
+    hand === 'left'
+      ? { corner: styles.leftHand, hintMemo: styles.hintMemoLeft }
+      : { corner: styles.rightHand, hintMemo: styles.hintMemoRight };
   const [revealed, setRevealed] = useState(false);
   // 정답을 열기 전에 힌트를 열면 힌트를 쓴 것으로 기록되고, 다시 닫아도 남는다.
   // 메모는 언제 열어도 기록하지 않는다(ADR 0017).
@@ -152,14 +158,14 @@ export function ReviewCard({
                       accessible
                       accessibilityLabel={`앞면 ${card.front}`}
                       // 스크린 리더(iOS VoiceOver)가 "앞면 …"의 글을 덱의 언어로 읽게 한다.
-                      accessibilityLanguage={language ?? undefined}
+                      accessibilityLanguage={languageAttribute}
                       onLayout={anchor.onFrontLayout}
                       style={anchor.offset === null ? undefined : { marginTop: anchor.offset }}
                     >
                       <Text
                         nativeID={frontId}
                         // 앞면은 덱의 발음 언어로 적힌 글이다. 웹에서는 lang으로 언어를 밝히고(RN 네이티브 Text에는 이 속성이 없다), 일본어는 JP 글리프 글꼴을 쓴다.
-                        lang={language ?? undefined}
+                        lang={languageAttribute}
                         style={[
                           text('display', { weight: 'bold', ja: isJapanese(language) }),
                           styles.center,
@@ -226,19 +232,13 @@ export function ReviewCard({
                     </Collapsible>
                     <View
                       testID="review-extra-buttons"
-                      style={[
-                        styles.extraButtons,
-                        hand === 'left' ? styles.leftHand : styles.rightHand,
-                      ]}
+                      style={[styles.extraButtons, handStyle.corner]}
                     >
                       {card.hint !== null || card.memo !== null ? (
                         // 캔버스에서 손 쪽으로 space-4 띄우는 것은 힌트·메모 버튼뿐이다. 발음 버튼은 모서리에 붙는다.
                         <View
                           testID="review-hint-memo-buttons"
-                          style={[
-                            styles.hintMemoButtons,
-                            hand === 'left' ? styles.hintMemoLeft : styles.hintMemoRight,
-                          ]}
+                          style={[styles.hintMemoButtons, handStyle.hintMemo]}
                         >
                           {card.hint !== null ? (
                             <IconButton
