@@ -52,7 +52,12 @@ export type Trash = {
   cards: (Card & { deletedAt: number })[];
 };
 
-export type CreateDeckInput = { name: string; language?: string | null };
+export type CreateDeckInput = {
+  name: string;
+  language?: string | null;
+  /** 덱과 함께 만들 카드. 덱과 카드는 한 트랜잭션이라 하나라도 실패하면 덱도 남지 않는다. */
+  cards?: CreateCardInput[];
+};
 
 export type CreateCardInput = {
   front: string;
@@ -108,6 +113,7 @@ export class StoreError extends Error {
  */
 export interface Store {
   // 덱
+  /** input.cards가 있으면 같은 트랜잭션에서 카드도 만든다(createCards와 같은 규칙). */
   createDeck(input: CreateDeckInput): Promise<Deck>;
   listDecks(): Promise<Deck[]>;
   /** 살아 있는 덱만. 휴지통의 덱은 listTrash로 본다. */
@@ -264,6 +270,30 @@ const newCardRow = (id: string, deckId: string, input: CreateCardInput, at: numb
   ...aliveMark(at),
 });
 
+// 카드 여러 장을 넘긴 순서대로 쓴다. 만든 시각은 start에서 1ms씩 늘려 목록(만든 순서)에서 순서가 유지된다.
+const putNewCards = async (
+  tx: PortTables,
+  deckId: string,
+  inputs: readonly CreateCardInput[],
+  start: number,
+  newId: () => string,
+): Promise<Card[]> => {
+  const created: Card[] = [];
+  for (const [index, input] of inputs.entries()) {
+    const row = newCardRow(newId(), deckId, input, start + index);
+    await tx.cards.put(row);
+    created.push(toCard(row));
+  }
+  return created;
+};
+
+const requireCardTexts = (inputs: readonly CreateCardInput[]): void => {
+  for (const input of inputs) {
+    requireText(input.front, '앞면');
+    requireText(input.back, '뒷면');
+  }
+};
+
 const requireText = (value: string | undefined, field: string): void => {
   if (value !== undefined && value.trim() === '') {
     throw new StoreError('invalid', `${field}이(가) 비어 있다.`);
@@ -373,6 +403,7 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   // 덱
   async createDeck(input) {
     requireText(input.name, '덱 이름');
+    requireCardTexts(input.cards ?? []);
     return port.transaction(async (tx) => {
       const now = deps.now();
       const row: DeckRow = {
@@ -385,6 +416,11 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
         ...aliveMark(now),
       };
       await tx.decks.put(row);
+      // 카드의 만든 시각은 덱과 따로 한 번 더 읽은 now()에서 시작한다(createCards와 같다).
+      // 카드가 없으면 now()를 더 읽지 않는다. 읽으면 이어지는 동작의 시각이 한 칸씩 밀린다.
+      if (input.cards !== undefined && input.cards.length > 0) {
+        await putNewCards(tx, row.id, input.cards, deps.now(), deps.newId);
+      }
       return toDeck(row);
     });
   },
@@ -432,20 +468,10 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
   },
 
   async createCards(deckId, inputs) {
-    for (const input of inputs) {
-      requireText(input.front, '앞면');
-      requireText(input.back, '뒷면');
-    }
+    requireCardTexts(inputs);
     return port.transaction(async (tx) => {
       await findAliveDeck(tx, deckId);
-      const start = deps.now();
-      const created: Card[] = [];
-      for (const [index, input] of inputs.entries()) {
-        const row = newCardRow(deps.newId(), deckId, input, start + index);
-        await tx.cards.put(row);
-        created.push(toCard(row));
-      }
-      return created;
+      return putNewCards(tx, deckId, inputs, deps.now(), deps.newId);
     });
   },
 

@@ -12,6 +12,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CheckIcon, Collapsible, Field, Notice, TopBar } from '@/components';
+import { ImportFileField } from '@/features/import/components/ImportFileField';
+import { toCardInputs } from '@/features/import/read-import-file';
+import { usePickedImport } from '@/features/import/use-picked-import';
 import { StoreError, type Deck } from '@/storage/store';
 import { saveFailureMessage } from '@/features/storage-status/storage-status';
 import { useHeldValue } from '@/hooks/use-held-value';
@@ -26,6 +29,9 @@ const languages = [
   { value: 'en', label: '영어' },
   { value: 'ko', label: '한국어' },
 ] as const;
+
+// 새 덱에는 같은 앞면을 가릴 기존 카드가 없다.
+const NO_FRONTS: readonly string[] = [];
 
 // 직접 연 경로에도 닫기/돌아가기 목적지를 제공한다.
 export const closeDeckForm = () => {
@@ -88,6 +94,10 @@ export function DeckForm({ deck }: { deck?: Deck }) {
   const active = useRef(true);
   const editing = deck !== undefined;
   const empty = name.trim() === '';
+  // 덱 만들기에서만 파일로 카드를 함께 넣는다(STA-167). 읽을 수 없는 파일은 지우거나 바꿔야 만들 수 있다.
+  const picked = usePickedImport(NO_FRONTS);
+  const cards = picked.outcome?.kind === 'preview' ? picked.outcome.cards : [];
+  const fileBlocked = !editing && picked.outcome?.kind === 'guide';
 
   useFocusEffect(
     useCallback(() => {
@@ -100,14 +110,19 @@ export function DeckForm({ deck }: { deck?: Deck }) {
 
   const save = async () => {
     // state 반영 전 완료 키/버튼이 연달아 들어와도 한 번만 저장한다.
-    if (empty || submitting.current) return;
+    if (empty || fileBlocked || submitting.current) return;
     submitting.current = true;
     setSaving(true);
     setFailure(null);
     try {
       const input = { name: name.trim(), language };
       if (deck) await store.updateDeck(deck.id, input);
-      else await store.createDeck(input);
+      else {
+        await store.createDeck({
+          ...input,
+          cards: toCardInputs(cards),
+        });
+      }
       // 저장 도중 닫았다면 뒤에 있는 화면까지 되돌리지 않는다.
       if (active.current) closeDeckForm();
     } catch (error) {
@@ -131,8 +146,9 @@ export function DeckForm({ deck }: { deck?: Deck }) {
         <>
           <Button
             label={saving ? '저장 중…' : editing ? '저장' : '만들기'}
+            count={!saving && cards.length > 0 ? `카드 ${cards.length}장` : undefined}
             onPress={save}
-            disabled={empty || saving}
+            disabled={empty || saving || fileBlocked}
           />
           {empty ? (
             <Text
@@ -140,6 +156,13 @@ export function DeckForm({ deck }: { deck?: Deck }) {
               style={[text('caption'), styles.hint, { color: colors.muted }]}
             >
               {editing ? '이름을 적으면 저장할 수 있어요' : '이름을 적으면 만들 수 있어요'}
+            </Text>
+          ) : fileBlocked ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[text('caption'), styles.hint, { color: colors.muted }]}
+            >
+              카드를 읽을 수 있는 파일을 고르거나 지우면 만들 수 있어요
             </Text>
           ) : null}
         </>
@@ -192,6 +215,7 @@ export function DeckForm({ deck }: { deck?: Deck }) {
           </Text>
         ) : null}
       </View>
+      {editing ? null : <ImportFileField picked={picked} disabled={saving} />}
       {/* 저장 실패 Notice는 높이를 열며 나타나고, 다시 저장하면 접힌다. 접히는 동안 마지막 문구를 보인다. */}
       <Collapsible open={failure !== null}>
         <Notice
