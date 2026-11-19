@@ -1,11 +1,12 @@
 import { StyleSheet } from 'react-native';
 
-import { FadeSwap } from '@/components';
+import { FadeSwap, Toast } from '@/components';
 import { ReviewBar } from '@/features/review/components/ReviewBar';
 import { ReviewCard } from '@/features/review/components/ReviewCard';
 import { ReviewDone } from '@/features/review/components/ReviewDone';
 import { useReviewProgress } from '@/features/review/use-review-progress';
 import { useTomorrowCount } from '@/features/review/use-tomorrow-count';
+import { useVoiceNotice } from '@/features/review/use-voice-notice';
 import type { Card } from '@/storage/store';
 
 // 대기열이 준비된 뒤의 복습. 카드를 하나씩 평가하고, 카드가 떨어지면 완료 화면을 보인다.
@@ -19,6 +20,8 @@ export function ReviewFlow({ deckIds, cards, insetBottom }: ReviewFlowProps) {
   const { progress, saving, pendingRating, rate } = useReviewProgress(cards);
   // 복습이 끝났을 때 저장된 이력으로 센다.
   const tomorrowCount = useTomorrowCount(deckIds, !progress.card);
+  // 발음 불가·무음 모드 안내(STA-128). 카드가 넘어가도 이어서 보이도록 카드 밖에 둔다.
+  const { notice, voiceMissing, spoke } = useVoiceNotice();
 
   // 마지막 평가 뒤 더미가 비면 "오늘 복습 끝"이 같은 자리에 페이드로 들어온다. 폭죽·숫자 올라가기는 없다.
   return (
@@ -38,7 +41,10 @@ export function ReviewFlow({ deckIds, cards, insetBottom }: ReviewFlowProps) {
             onRate={rate}
             ratingDisabled={saving}
             pendingRating={pendingRating}
+            onVoiceMissing={voiceMissing}
+            onSpoke={spoke}
           />
+          {notice ? <Toast message={notice.message} sub={notice.sub} above="rating" /> : null}
         </>
       ) : (
         <ReviewDone
