@@ -118,6 +118,11 @@ export interface Store {
 
   // 카드
   createCard(deckId: string, input: CreateCardInput): Promise<Card>;
+  /**
+   * 카드 여러 장을 한 트랜잭션에서 만든다. 하나라도 잘못됐거나 쓰다가 실패하면 한 장도 남지 않는다.
+   * 만든 시각은 한 번 읽은 now()에서 카드마다 1ms씩 늘려, 목록(만든 순서)에서 넘긴 순서가 유지된다.
+   */
+  createCards(deckId: string, inputs: CreateCardInput[]): Promise<Card[]>;
   /** 살아 있는 카드만. */
   getCard(cardId: string): Promise<Card | null>;
   /** 덱이 없거나 휴지통에 있으면 거부한다. 빈 덱과 구분하기 위해서다. */
@@ -241,6 +246,23 @@ const trashMark = (now: number, opId: string) => ({
 });
 
 const aliveMark = (now: number) => ({ deleted_at: null, deleted_ts: now, deleted_by_op: null });
+
+const newCardRow = (id: string, deckId: string, input: CreateCardInput, at: number): CardRow => ({
+  id,
+  deck_id: deckId,
+  front: input.front,
+  back: input.back,
+  hint: input.hint ?? null,
+  memo: input.memo ?? null,
+  image: input.image ?? null,
+  created_at: at,
+  front_ts: at,
+  back_ts: at,
+  hint_ts: at,
+  memo_ts: at,
+  image_ts: at,
+  ...aliveMark(at),
+});
 
 const requireText = (value: string | undefined, field: string): void => {
   if (value !== undefined && value.trim() === '') {
@@ -403,25 +425,27 @@ export const createStore = (port: Port, deps: StoreDeps): Store => ({
     requireText(input.back, '뒷면');
     return port.transaction(async (tx) => {
       await findAliveDeck(tx, deckId);
-      const now = deps.now();
-      const row: CardRow = {
-        id: deps.newId(),
-        deck_id: deckId,
-        front: input.front,
-        back: input.back,
-        hint: input.hint ?? null,
-        memo: input.memo ?? null,
-        image: input.image ?? null,
-        created_at: now,
-        front_ts: now,
-        back_ts: now,
-        hint_ts: now,
-        memo_ts: now,
-        image_ts: now,
-        ...aliveMark(now),
-      };
+      const row = newCardRow(deps.newId(), deckId, input, deps.now());
       await tx.cards.put(row);
       return toCard(row);
+    });
+  },
+
+  async createCards(deckId, inputs) {
+    for (const input of inputs) {
+      requireText(input.front, '앞면');
+      requireText(input.back, '뒷면');
+    }
+    return port.transaction(async (tx) => {
+      await findAliveDeck(tx, deckId);
+      const start = deps.now();
+      const created: Card[] = [];
+      for (const [index, input] of inputs.entries()) {
+        const row = newCardRow(deps.newId(), deckId, input, start + index);
+        await tx.cards.put(row);
+        created.push(toCard(row));
+      }
+      return created;
     });
   },
 

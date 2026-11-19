@@ -166,7 +166,9 @@ describe('카드 추가', () => {
   const openForm = async (store: Store, deckId: string) => {
     await renderApp(store, `/deck/${deckId}`);
     const user = setupUser();
+    // "카드 추가"는 시트를 연다(직접 쓰기 / 파일로 가져오기, STA-166).
     await user.press(screen.getByRole('button', { name: '카드 추가' }));
+    await user.press(await screen.findByRole('button', { name: '직접 쓰기' }));
     return user;
   };
 

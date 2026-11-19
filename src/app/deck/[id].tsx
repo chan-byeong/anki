@@ -1,19 +1,22 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Button,
   Collapsible,
   EditIcon,
+  CheckIcon,
   ExitingRow,
   FadeSwap,
+  MemoIcon,
   MoreIcon,
   Notice,
   PageHeader,
   PlusIcon,
   Sheet,
+  type SheetAction,
   Toast,
   TopBar,
   TrashIcon,
@@ -33,7 +36,7 @@ import { goBack } from '@/utils/go-back';
 
 // 덱 상세(Deck-1, Deck-2, Deck-4). 메뉴의 덱 삭제는 확인 없이 덱을 카드와 함께 휴지통으로 보낸다(복구할 수 있다).
 export default function DeckScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, imported } = useLocalSearchParams<{ id: string; imported?: string }>();
   const { state, retry } = useDeck(id);
   // 카드를 휴지통으로 보내거나 되돌린 뒤 목록을 다시 읽는다.
   const [version, reload] = useReducer((count: number) => count + 1, 0);
@@ -51,9 +54,29 @@ export default function DeckScreen() {
   const [trashedCardId, setTrashedCardId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<ViewInstance>(null);
+  // "카드 추가" 시트: 직접 쓰기와 파일로 가져오기(Import-1). 닫힐 때 누른 버튼으로 포커스가 돌아간다.
+  const [addOpen, setAddOpen] = useState(false);
+  const addRef = useRef<ViewInstance>(null);
+  // 가져오기를 마치고 돌아오면 import 화면이 추가한 장수를 파라미터로 넘긴다. 토스트가 사라질 때 파라미터를 지운다.
+  const importedCount = Number.isInteger(Number(imported)) && imported ? Number(imported) : null;
   const [query, setQuery] = useState('');
 
-  const addCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });
+  const writeCard = () => router.push({ pathname: '/card/new', params: { deckId: id } });
+  const importCards = () => router.push({ pathname: '/import', params: { deckId: id } });
+  // 파일 선택기와 읽기는 모바일만 다룬다(STA-166 범위).
+  const addActions: SheetAction[] = [
+    { label: '직접 쓰기', icon: EditIcon, onPress: writeCard },
+    ...(Platform.OS === 'web'
+      ? []
+      : [
+          {
+            label: '.md 파일로 가져오기',
+            icon: MemoIcon,
+            description: '여러 장을 한 번에 넣어요',
+            onPress: importCards,
+          },
+        ]),
+  ];
   const trashCard = async (cardId: string) => {
     await store.trashCard(cardId);
     setTrashedCardId(cardId);
@@ -75,6 +98,11 @@ export default function DeckScreen() {
     const timer = setTimeout(() => setTrashedCardId(null), toastHold.plain);
     return () => clearTimeout(timer);
   }, [trashedCardId]);
+  useEffect(() => {
+    if (importedCount === null) return;
+    const timer = setTimeout(() => router.setParams({ imported: undefined }), toastHold.plain);
+    return () => clearTimeout(timer);
+  }, [importedCount]);
   const openCard = (cardId: string) =>
     router.push({ pathname: '/card/[id]', params: { id: cardId } });
   const startReview = () => router.push({ pathname: '/review/[deckId]', params: { deckId: id } });
@@ -150,7 +178,7 @@ export default function DeckScreen() {
           )}
           <View style={[styles.footer, { paddingBottom: space[2] + insets.bottom }]}>
             {cards.cards.length === 0 ? (
-              <Button label="카드 추가" onPress={addCard} />
+              <Button ref={addRef} label="카드 추가" onPress={() => setAddOpen(true)} />
             ) : (
               <View style={styles.actions}>
                 <View style={styles.fill}>
@@ -162,7 +190,13 @@ export default function DeckScreen() {
                     />
                   ) : null}
                 </View>
-                <Button label="카드 추가" icon={PlusIcon} variant="secondary" onPress={addCard} />
+                <Button
+                  ref={addRef}
+                  label="카드 추가"
+                  icon={PlusIcon}
+                  variant="secondary"
+                  onPress={() => setAddOpen(true)}
+                />
               </View>
             )}
           </View>
@@ -171,6 +205,16 @@ export default function DeckScreen() {
       {trashedCardId !== null ? (
         <Toast message="휴지통으로 옮겼어요" action={{ label: '되돌리기', onPress: undoTrash }} />
       ) : null}
+      {importedCount !== null ? (
+        <Toast message={`카드 ${importedCount}장을 추가했어요`} icon={CheckIcon} />
+      ) : null}
+      <Sheet
+        visible={addOpen}
+        kind="menu"
+        triggerRef={addRef}
+        onClose={() => setAddOpen(false)}
+        actions={addActions}
+      />
       <Sheet
         visible={menuOpen && state.kind === 'ready'}
         kind="menu"
