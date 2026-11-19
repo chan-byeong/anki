@@ -1,5 +1,7 @@
 import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import { ReviewFlow } from '@/features/review/components/ReviewFlow';
 import { HandProvider } from '@/features/settings/HandProvider';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
@@ -8,6 +10,11 @@ import { StoreProvider } from '@/storage/StoreProvider';
 import { createTestClock, createTestIds } from '@/storage/testing/deps';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { speech } from '@/utils/speech';
+
+const safeArea = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 0, left: 0, right: 0, bottom: 0 },
+};
 
 // jest-expo의 네이티브 UUID 기본 모의는 undefined를 반환하므로 난수 경계만 대체한다.
 jest.mock('expo-crypto', () => ({
@@ -23,7 +30,9 @@ jest.mock('@/utils/haptics', () => ({
   haptic: { rate: jest.fn(), select: jest.fn(), threshold: jest.fn() },
 }));
 // 실제 음성은 기기에서만 난다. 화면이 무엇을 읽으라고 하는지만 본다.
-jest.mock('@/utils/speech', () => ({ speech: { speak: jest.fn(), stop: jest.fn() } }));
+jest.mock('@/utils/speech', () => ({
+  speech: { speak: jest.fn(), stop: jest.fn(), hasVoice: jest.fn().mockResolvedValue(true) },
+}));
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -52,13 +61,15 @@ const seed = async (cards: { front: string; back: string; memo?: string }[]) => 
 
 const renderFlow = async (store: Store, deckId: string, cards: Card[]) => {
   await render(
-    <ThemeProvider override="light">
-      <HandProvider>
-        <StoreProvider store={store}>
-          <ReviewFlow deckIds={[deckId]} cards={cards} insetBottom={0} />
-        </StoreProvider>
-      </HandProvider>
-    </ThemeProvider>,
+    <SafeAreaProvider initialMetrics={safeArea}>
+      <ThemeProvider override="light">
+        <HandProvider>
+          <StoreProvider store={store}>
+            <ReviewFlow deckIds={[deckId]} cards={cards} insetBottom={0} />
+          </StoreProvider>
+        </HandProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>,
   );
   await advance(1);
 };
@@ -130,13 +141,15 @@ describe('복습 화면의 발음 재생', () => {
   test('다크 테마에서도 발음 버튼이 있고 읽는다', async () => {
     const { store, deck, cards } = await seed([{ front: '食べる', back: '먹다' }]);
     await render(
-      <ThemeProvider override="dark">
-        <HandProvider>
-          <StoreProvider store={store}>
-            <ReviewFlow deckIds={[deck.id]} cards={cards} insetBottom={0} />
-          </StoreProvider>
-        </HandProvider>
-      </ThemeProvider>,
+      <SafeAreaProvider initialMetrics={safeArea}>
+        <ThemeProvider override="dark">
+          <HandProvider>
+            <StoreProvider store={store}>
+              <ReviewFlow deckIds={[deck.id]} cards={cards} insetBottom={0} />
+            </StoreProvider>
+          </HandProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>,
     );
     await advance(1);
 

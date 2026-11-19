@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, CheckIcon, Collapsible, Field, Notice, TopBar } from '@/components';
+import { languages } from '@/features/decks/languages';
 import { ImportFileField } from '@/features/import/components/ImportFileField';
 import { toCardInputs } from '@/features/import/read-import-file';
 import { usePickedImport } from '@/features/import/use-picked-import';
@@ -21,14 +22,6 @@ import { useHeldValue } from '@/hooks/use-held-value';
 import { useStore } from '@/storage/StoreProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { size, space } from '@/theme/tokens';
-
-// DeckForm-1/2. 발음 미리듣기·기기 음성 확인과 추가 언어는 후속 작업에서 연결한다.
-const languages = [
-  { value: null, label: '없음' },
-  { value: 'ja', label: '일본어' },
-  { value: 'en', label: '영어' },
-  { value: 'ko', label: '한국어' },
-] as const;
 
 // 새 덱에는 같은 앞면을 가릴 기존 카드가 없다.
 const NO_FRONTS: readonly string[] = [];

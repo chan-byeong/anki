@@ -1,5 +1,7 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import { ReviewFlow } from '@/features/review/components/ReviewFlow';
 import { HandProvider } from '@/features/settings/HandProvider';
 import { createMemoryBacking, createMemoryPort } from '@/storage/memory-port';
@@ -10,6 +12,11 @@ import { ThemeProvider } from '@/theme/ThemeProvider';
 import { motion, shift } from '@/theme/tokens';
 import { haptic } from '@/utils/haptics';
 
+const safeArea = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 0, left: 0, right: 0, bottom: 0 },
+};
+
 // jest-expo의 네이티브 UUID 기본 모의는 undefined를 반환하므로 난수 경계만 대체한다.
 jest.mock('expo-crypto', () => ({
   randomUUID: () => jest.requireActual('node:crypto').randomUUID(),
@@ -17,7 +24,9 @@ jest.mock('expo-crypto', () => ({
 // 덱 이름은 화면 포커스(라우터)에 묶여 있어서 이 테스트의 관심 밖이다.
 jest.mock('@/features/decks/use-deck-name', () => ({ useDeckName: () => '영어 단어' }));
 jest.mock('@/features/decks/use-deck-language', () => ({ useDeckLanguage: () => null }));
-jest.mock('@/utils/speech', () => ({ speech: { speak: jest.fn(), stop: jest.fn() } }));
+jest.mock('@/utils/speech', () => ({
+  speech: { speak: jest.fn(), stop: jest.fn(), hasVoice: jest.fn().mockResolvedValue(true) },
+}));
 jest.mock('@/utils/haptics', () => ({
   haptic: { rate: jest.fn(), select: jest.fn(), threshold: jest.fn() },
 }));
@@ -63,13 +72,15 @@ const seed = async (count: number) => {
 
 const renderFlow = async (store: Store, deckId: string, cards: Card[]) => {
   await render(
-    <ThemeProvider override="light">
-      <HandProvider>
-        <StoreProvider store={store}>
-          <ReviewFlow deckIds={[deckId]} cards={cards} insetBottom={0} />
-        </StoreProvider>
-      </HandProvider>
-    </ThemeProvider>,
+    <SafeAreaProvider initialMetrics={safeArea}>
+      <ThemeProvider override="light">
+        <HandProvider>
+          <StoreProvider store={store}>
+            <ReviewFlow deckIds={[deckId]} cards={cards} insetBottom={0} />
+          </StoreProvider>
+        </HandProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>,
   );
   await advance(1);
 };

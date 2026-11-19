@@ -20,6 +20,7 @@ import {
   RatingMark,
   SpeakerIcon,
 } from '@/components';
+import { languageName } from '@/features/decks/languages';
 import { useDeckLanguage } from '@/features/decks/use-deck-language';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import { CardPile } from '@/features/review/components/CardPile';
@@ -28,6 +29,7 @@ import { isJapanese, pronunciationTarget } from '@/features/review/pronunciation
 import { useCardFlip } from '@/features/review/use-card-flip';
 import { useFrontAnchor } from '@/features/review/use-front-anchor';
 import { useSwipeRate } from '@/features/review/use-swipe-rate';
+import { useVoiceStatus } from '@/features/review/use-voice-status';
 import { useHand } from '@/features/settings/HandProvider';
 import type { Card, Rating } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -55,6 +57,9 @@ interface ReviewCardProps {
   onRate: (rating: Rating, hintUsed: boolean) => void;
   ratingDisabled: boolean;
   pendingRating: Rating | null;
+  // 이 카드 언어의 음성이 기기에 없을 때, 발음 버튼을 눌러 읽기를 시작했을 때(STA-128).
+  onVoiceMissing: (language: string) => void;
+  onSpoke: () => void;
 }
 
 export function ReviewCard({
@@ -66,6 +71,8 @@ export function ReviewCard({
   onRate,
   ratingDisabled,
   pendingRating,
+  onVoiceMissing,
+  onSpoke,
 }: ReviewCardProps) {
   const { colors, text } = useTheme();
   const { width } = useWindowDimensions();
@@ -80,6 +87,12 @@ export function ReviewCard({
   const target = pronunciationTarget(card, language);
   // lang·accessibilityLanguage에는 없음을 null이 아니라 undefined로 넘긴다.
   const languageAttribute = language ?? undefined;
+  // 기기에 그 언어 음성이 없으면 발음 버튼을 흐리게 하고 이유를 알린다. 확인 중(null)에는 켜 둔다.
+  const voiceMissing = useVoiceStatus(target?.language ?? null) === 'missing';
+  const missingLanguage = voiceMissing && target !== null ? target.language : null;
+  useEffect(() => {
+    if (missingLanguage !== null) onVoiceMissing(missingLanguage);
+  }, [missingLanguage, onVoiceMissing]);
   // 카드가 넘어가거나 화면을 떠나면 읽던 소리를 멈춘다. 카드마다 새로 만들어지므로 한 번만 건다.
   useEffect(() => speech.stop, []);
   // 힌트·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
@@ -266,8 +279,16 @@ export function ReviewCard({
                         <IconButton
                           icon={SpeakerIcon}
                           tone="muted"
-                          label="발음 재생"
-                          onPress={() => speech.speak(target.text, target.language)}
+                          label={
+                            voiceMissing
+                              ? `발음 재생 (이 기기에 ${languageName(target.language)} 음성 없음)`
+                              : '발음 재생'
+                          }
+                          disabled={voiceMissing}
+                          onPress={() => {
+                            speech.speak(target.text, target.language);
+                            onSpoke();
+                          }}
                         />
                       ) : null}
                     </View>
