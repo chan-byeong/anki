@@ -106,7 +106,9 @@ describe('주로 쓰는 손: 복습 화면', () => {
 
       const buttons = screen.getByTestId('review-extra-buttons');
       expect(within(buttons).getByRole('button', { name: '메모 열기' })).toBeTruthy();
-      expect(buttons).toHaveStyle({ alignSelf: side, ...margin });
+      // 줄은 그 손 쪽 모서리에 서고, 그쪽으로 띄우는 것은 힌트·메모 버튼 묶음이다(발음 버튼은 모서리에 붙는다).
+      expect(buttons).toHaveStyle({ alignSelf: side });
+      expect(screen.getByTestId('review-hint-memo-buttons')).toHaveStyle(margin);
     },
   );
 

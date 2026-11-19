@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Polygon, Polyline, Rect } from 'react-native-svg';
 
 export interface IconProps {
   color: string;
@@ -111,6 +111,14 @@ export const MemoIcon: IconComponent = (props) => (
     <Polyline points="14 2 14 8 20 8" />
     <Line x1="16" y1="13" x2="8" y2="13" />
     <Line x1="16" y1="17" x2="8" y2="17" />
+  </Glyph>
+);
+
+// 발음 재생(Review-1~3). 스피커와 음파.
+export const SpeakerIcon: IconComponent = (props) => (
+  <Glyph {...props}>
+    <Polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+    <Path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
   </Glyph>
 );
 

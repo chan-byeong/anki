@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   Pressable,
@@ -11,10 +11,20 @@ import {
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 
-import { Collapsible, FadeSwap, HintIcon, IconButton, MemoIcon, RatingMark } from '@/components';
+import {
+  Collapsible,
+  FadeSwap,
+  HintIcon,
+  IconButton,
+  MemoIcon,
+  RatingMark,
+  SpeakerIcon,
+} from '@/components';
+import { useDeckLanguage } from '@/features/decks/use-deck-language';
 import { useDeckName } from '@/features/decks/use-deck-name';
 import { CardPile } from '@/features/review/components/CardPile';
 import { RatingButtons } from '@/features/review/components/RatingButtons';
+import { isJapanese, pronunciationTarget } from '@/features/review/pronunciation-target';
 import { useCardFlip } from '@/features/review/use-card-flip';
 import { useFrontAnchor } from '@/features/review/use-front-anchor';
 import { useSwipeRate } from '@/features/review/use-swipe-rate';
@@ -23,6 +33,7 @@ import type { Card, Rating } from '@/storage/store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, size, space } from '@/theme/tokens';
 import { haptic } from '@/utils/haptics';
+import { speech } from '@/utils/speech';
 
 // 복습 중인 카드 한 장. 앞면을 먼저 보이고, 카드를 누르면 뒷면(정답)과 평가 버튼을 연다.
 
@@ -64,6 +75,11 @@ export function ReviewCard({
   // 겹쳐 뜬 메모·힌트 칸과 아이콘 줄의 높이. 그만큼 본문 아래 여백을 둬 가려진 내용도 스크롤로 볼 수 있다.
   const [extrasHeight, setExtrasHeight] = useState(0);
   const deckName = useDeckName(card.deckId);
+  // 발음 버튼은 덱에 발음 언어가 있을 때만 나온다. 누를 때만 읽고 저절로 읽지 않는다(STA-127).
+  const language = useDeckLanguage(card.deckId);
+  const target = pronunciationTarget(card, language);
+  // 카드가 넘어가거나 화면을 떠나면 읽던 소리를 멈춘다. 카드마다 새로 만들어지므로 한 번만 건다.
+  useEffect(() => speech.stop, []);
   // 힌트·메모 버튼은 주로 쓰는 손 쪽 모서리에 모인다. 평가 버튼 순서는 손과 상관없다.
   const { hand } = useHand();
   const [revealed, setRevealed] = useState(false);
@@ -135,12 +151,19 @@ export function ReviewCard({
                     <View
                       accessible
                       accessibilityLabel={`앞면 ${card.front}`}
+                      // 스크린 리더(iOS VoiceOver)가 "앞면 …"의 글을 덱의 언어로 읽게 한다.
+                      accessibilityLanguage={language ?? undefined}
                       onLayout={anchor.onFrontLayout}
                       style={anchor.offset === null ? undefined : { marginTop: anchor.offset }}
                     >
                       <Text
                         nativeID={frontId}
-                        style={[text('display', { weight: 'bold' }), styles.center]}
+                        // 앞면은 덱의 발음 언어로 적힌 글이다. 웹에서는 lang으로 언어를 밝히고(RN 네이티브 Text에는 이 속성이 없다), 일본어는 JP 글리프 글꼴을 쓴다.
+                        lang={language ?? undefined}
+                        style={[
+                          text('display', { weight: 'bold', ja: isJapanese(language) }),
+                          styles.center,
+                        ]}
                       >
                         {card.front}
                       </Text>
@@ -164,7 +187,7 @@ export function ReviewCard({
                     </View>
                   </ScrollView>
                 </Pressable>
-                {card.hint !== null || card.memo !== null ? (
+                {card.hint !== null || card.memo !== null || target !== null ? (
                   <View
                     testID="review-extras"
                     style={styles.extras}
@@ -208,24 +231,43 @@ export function ReviewCard({
                         hand === 'left' ? styles.leftHand : styles.rightHand,
                       ]}
                     >
-                      {card.hint !== null ? (
-                        <IconButton
-                          icon={HintIcon}
-                          tone="muted"
-                          label={hintShown ? '힌트 닫기' : '힌트 열기'}
-                          pressed={hintShown}
-                          // 다시 시도 중에는 힌트 상태가 바뀌지 않게 막는다.
-                          disabled={pendingRating !== null}
-                          onPress={toggleHint}
-                        />
+                      {card.hint !== null || card.memo !== null ? (
+                        // 캔버스에서 손 쪽으로 space-4 띄우는 것은 힌트·메모 버튼뿐이다. 발음 버튼은 모서리에 붙는다.
+                        <View
+                          testID="review-hint-memo-buttons"
+                          style={[
+                            styles.hintMemoButtons,
+                            hand === 'left' ? styles.hintMemoLeft : styles.hintMemoRight,
+                          ]}
+                        >
+                          {card.hint !== null ? (
+                            <IconButton
+                              icon={HintIcon}
+                              tone="muted"
+                              label={hintShown ? '힌트 닫기' : '힌트 열기'}
+                              pressed={hintShown}
+                              // 다시 시도 중에는 힌트 상태가 바뀌지 않게 막는다.
+                              disabled={pendingRating !== null}
+                              onPress={toggleHint}
+                            />
+                          ) : null}
+                          {card.memo !== null ? (
+                            <IconButton
+                              icon={MemoIcon}
+                              tone="muted"
+                              label={memoShown ? '메모 닫기' : '메모 열기'}
+                              pressed={memoShown}
+                              onPress={() => setMemoOpen((open) => !open)}
+                            />
+                          ) : null}
+                        </View>
                       ) : null}
-                      {card.memo !== null ? (
+                      {target !== null ? (
                         <IconButton
-                          icon={MemoIcon}
+                          icon={SpeakerIcon}
                           tone="muted"
-                          label={memoShown ? '메모 닫기' : '메모 열기'}
-                          pressed={memoShown}
-                          onPress={() => setMemoOpen((open) => !open)}
+                          label="발음 재생"
+                          onPress={() => speech.speak(target.text, target.language)}
                         />
                       ) : null}
                     </View>
@@ -297,12 +339,14 @@ const styles = StyleSheet.create({
   // 칸 아래 간격(space-2)을 열리는 높이 안에 둔다. 부모 gap으로 두면 접힘이 끝나는 순간 간격만큼 튄다.
   panelSlot: { paddingBottom: space[2] },
   panel: { padding: space[3], borderRadius: radius.sm, gap: space[2] },
-  // 캔버스의 아이콘 세로 줄(간격 space-3)에 힌트 버튼을 메모 버튼 위에 더한다.
-  // 캔버스(Review-1~3의 hand)는 줄을 손 쪽 모서리에 두고 메모 버튼만 그쪽으로 space-4 띄운다.
-  // 그 아래 붙는 발음 버튼이 아직 없어 줄 전체에 띄웠다. 발음 버튼을 더할 때 이 여백을 메모·힌트 버튼으로 옮긴다.
+  // 캔버스의 아이콘 세로 줄(간격 space-3). 줄은 손 쪽 모서리에 있고, 맨 아래가 발음 버튼이다.
+  // 힌트·메모 버튼 묶음만 그쪽으로 space-4 띄운다(Review-1~3, 7).
   extraButtons: { gap: space[3] },
-  rightHand: { alignSelf: 'flex-end', marginRight: space[4] },
-  leftHand: { alignSelf: 'flex-start', marginLeft: space[4] },
+  rightHand: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+  leftHand: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+  hintMemoButtons: { gap: space[3] },
+  hintMemoRight: { marginRight: space[4] },
+  hintMemoLeft: { marginLeft: space[4] },
   // 캔버스의 덱 이름 자리(왼쪽 위). 긴 글이 스크롤돼도 가리지 않도록 본문 위쪽에 여백을 둔다.
   deck: { position: 'absolute', top: space[3], left: space[4] },
   content: {
