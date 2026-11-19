@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { isStorageFullError } from '@/features/storage-status/storage-status';
 import { useStore } from '@/storage/StoreProvider';
 
-import { importOutcome, type ImportOutcome } from './import-outcome';
-import { pickImportFile, type PickedFile } from './pick-import-file';
-import { readImportFile, type ImportReading } from './read-import-file';
+import type { ImportOutcome } from './import-outcome';
+import type { PickedFile } from './pick-import-file';
+import { toCardInputs, type ImportReading } from './read-import-file';
+import { usePickedImport } from './use-picked-import';
 
 type FrontsState = { kind: 'loading' } | { kind: 'ready'; fronts: string[] } | { kind: 'failed' };
 
@@ -60,47 +61,24 @@ export interface ImportFlow {
 export function useImportFlow(entryDeckId: string): ImportFlow {
   const store = useStore();
   const [deckId, setDeckId] = useState(entryDeckId);
-  const [file, setFile] = useState<PickedFile | null>(null);
-  const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveFailure, setSaveFailure] = useState<string | null>(null);
   const fronts = useDeckFronts(deckId);
-
-  const reading = useMemo(
-    () =>
-      file?.kind === 'bytes' && fronts.kind === 'ready'
-        ? readImportFile(file.bytes, fronts.fronts)
-        : null,
-    [file, fronts],
-  );
-
-  const outcome = useMemo(
-    () => (file === null ? null : importOutcome(file, reading)),
-    [file, reading],
-  );
+  const picked = usePickedImport(fronts.kind === 'ready' ? fronts.fronts : null);
+  const { reading, pick: pickFile } = picked;
 
   const pick = useCallback(async () => {
-    setPicking(true);
-    try {
-      const picked = await pickImportFile();
-      if (picked === null) return false;
-      setSaveFailure(null);
-      setFile(picked);
-      return true;
-    } finally {
-      setPicking(false);
-    }
-  }, []);
+    const ok = await pickFile();
+    if (ok) setSaveFailure(null);
+    return ok;
+  }, [pickFile]);
 
   const save = useCallback(async () => {
     if (reading?.ok !== true || reading.cards.length === 0 || saving) return null;
     setSaving(true);
     setSaveFailure(null);
     try {
-      const created = await store.createCards(
-        deckId,
-        reading.cards.map(({ front, back, memo, hint }) => ({ front, back, memo, hint })),
-      );
+      const created = await store.createCards(deckId, toCardInputs(reading.cards));
       return created.length;
     } catch (error) {
       setSaveFailure(importFailureMessage(error));
@@ -113,11 +91,11 @@ export function useImportFlow(entryDeckId: string): ImportFlow {
   return {
     deckId,
     setDeckId,
-    file,
-    picking,
+    file: picked.file,
+    picking: picked.picking,
     fronts,
     reading,
-    outcome,
+    outcome: picked.outcome,
     saving,
     saveFailure,
     pick,

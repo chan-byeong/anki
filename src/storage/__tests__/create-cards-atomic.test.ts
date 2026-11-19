@@ -74,4 +74,22 @@ describe.each(cases)('createCards 원자성: %s', (_name, makeHarness) => {
     expect(await port.cards.listAliveByDeck(deck.id)).toEqual([]);
     expect(await store.countCardsByDeck()).toEqual({ [deck.id]: 0 });
   });
+
+  test('덱과 카드를 함께 만들다 실패하면 덱도 남지 않는다', async () => {
+    const { store } = await harness.open();
+
+    await expect(
+      store.createDeck({
+        name: '영어 단어',
+        cards: [
+          { front: 'apple', back: '사과' },
+          { front: 'pear', back: '배' },
+          { front: 'plum', back: '자두' },
+        ],
+      }),
+    ).rejects.toThrow('디스크 쓰기 실패');
+
+    expect(await store.listDecks()).toEqual([]);
+    expect(await store.countCardsByDeck()).toEqual({});
+  });
 });

@@ -227,6 +227,61 @@ export const describeStoreContract = (
       });
     });
 
+    describe('덱과 카드 한 번에 만들기', () => {
+      test('cards를 함께 넘기면 덱과 카드가 만들어지고 카드는 넘긴 순서대로 보인다', async () => {
+        const { store } = await harness.open();
+
+        const deck = await store.createDeck({
+          name: '일본어',
+          language: 'ja',
+          cards: [
+            { front: '食べる', back: '먹다', memo: '朝ごはん', hint: 'た' },
+            { front: '飲む', back: '마시다' },
+          ],
+        });
+
+        expect(deck).toEqual({ id: deck.id, name: '일본어', language: 'ja', createdAt: 1000 });
+        const cards = await store.listCards(deck.id);
+        expect(
+          cards.map(({ front, back, memo, hint, createdAt }) => [
+            front,
+            back,
+            memo,
+            hint,
+            createdAt,
+          ]),
+        ).toEqual([
+          ['食べる', '먹다', '朝ごはん', 'た', 2000],
+          ['飲む', '마시다', null, null, 2001],
+        ]);
+        expect(await store.countCardsByDeck()).toEqual({ [deck.id]: 2 });
+      });
+
+      test('cards 없이 만들면 지금처럼 빈 덱이 만들어진다', async () => {
+        const { store } = await harness.open();
+
+        const deck = await store.createDeck({ name: '영어 단어', cards: [] });
+
+        expect(await store.listCards(deck.id)).toEqual([]);
+      });
+
+      test('빈 앞면·뒷면이 있는 카드가 하나라도 있으면 덱도 만들지 않는다', async () => {
+        const { store } = await harness.open();
+
+        await expect(
+          store.createDeck({
+            name: '영어 단어',
+            cards: [
+              { front: 'apple', back: '사과' },
+              { front: 'pear', back: '' },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: 'invalid' });
+
+        expect(await store.listDecks()).toEqual([]);
+      });
+    });
+
     describe('다시 열기', () => {
       test('저장소를 닫았다가 다시 열어도 덱, 카드, 학습 이력이 그대로다', async () => {
         const first = await harness.open();
